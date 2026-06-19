@@ -6,6 +6,8 @@ import { SyncButton } from "@/components/sync-button";
 import { AutoSync } from "@/components/auto-sync";
 import { Flag } from "@/components/ui/flag";
 import { Reveal } from "@/components/ui/reveal";
+import { SearchBox } from "@/components/ui/search-box";
+import { Pagination } from "@/components/ui/pagination";
 import { fixtureBundles, type FixtureBundle } from "@/lib/queries";
 import { getLastSync } from "@/lib/store";
 import { activeCompetitions } from "@/lib/data/competitions";
@@ -16,11 +18,16 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Fixtures // Receipts" };
 
-export default function FixturesPage({ searchParams }: { searchParams: { comp?: string } }) {
+const PER_PAGE = 8;
+
+export default function FixturesPage({
+  searchParams,
+}: {
+  searchParams: { comp?: string; q?: string; page?: string };
+}) {
   const all = fixtureBundles();
   const lastSync = getLastSync();
 
-  // counts per competition for the tabs
   const countFor = (code: string) =>
     all.filter((f) => f.match.competition.code === code).length;
 
@@ -31,15 +38,43 @@ export default function FixturesPage({ searchParams }: { searchParams: { comp?: 
     return countFor(b.code) - countFor(a.code);
   });
 
-  // default to the requested tab, else the first competition that has fixtures,
-  // else the World Cup
   const withFixtures = comps.find((c) => countFor(c.code) > 0)?.code;
   const selected = searchParams.comp || withFixtures || "WC";
+  const selectedName = comps.find((c) => c.code === selected)?.name ?? "Fixtures";
 
   const inComp = all.filter((f) => f.match.competition.code === selected);
-  const upcoming = inComp.filter((f) => f.match.status !== "RESOLVED");
-  const resolved = inComp.filter((f) => f.match.status === "RESOLVED");
-  const selectedName = comps.find((c) => c.code === selected)?.name ?? "Fixtures";
+
+  // search
+  const q = (searchParams.q ?? "").toLowerCase().trim();
+  const matchesQuery = (f: FixtureBundle) => {
+    if (!q) return true;
+    const m = f.match;
+    return [m.home.name, m.away.name, m.home.code, m.away.code, m.stage].some((s) =>
+      s.toLowerCase().includes(q),
+    );
+  };
+  const filtered = inComp.filter(matchesQuery);
+
+  // upcoming first (kickoff ascending), then settled (most recent first)
+  const sorted = [...filtered].sort((a, b) => {
+    const ra = a.match.status === "RESOLVED" ? 1 : 0;
+    const rb = b.match.status === "RESOLVED" ? 1 : 0;
+    if (ra !== rb) return ra - rb;
+    const ta = new Date(a.match.kickoff).getTime();
+    const tb = new Date(b.match.kickoff).getTime();
+    return ra === 1 ? tb - ta : ta - tb;
+  });
+
+  // pagination
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const page = Math.min(
+    Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1),
+    totalPages,
+  );
+  const pageItems = sorted.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const upcomingCount = filtered.filter((f) => f.match.status !== "RESOLVED").length;
+  const settledCount = filtered.length - upcomingCount;
 
   return (
     <Container className="py-16">
@@ -90,14 +125,21 @@ export default function FixturesPage({ searchParams }: { searchParams: { comp?: 
         </div>
       ) : (
         <>
-          <h2 className="mb-6 mt-10 font-mono text-xs uppercase tracking-widest text-acid">
-            Upcoming · open for picks ({upcoming.length})
-          </h2>
-          {upcoming.length === 0 ? (
-            <p className="font-mono text-xs text-muted">No upcoming fixtures in this competition right now.</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SearchBox key={selected} placeholder="Search teams…" />
+            <div className="font-mono text-[0.7rem] text-muted">
+              {upcomingCount} upcoming · {settledCount} settled
+              {q && <span className="text-chalk"> · &ldquo;{q}&rdquo;</span>}
+            </div>
+          </div>
+
+          {pageItems.length === 0 ? (
+            <p className="mt-10 font-mono text-sm text-muted">
+              No fixtures match that search in {selectedName}.
+            </p>
           ) : (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {upcoming.map((f, i) => (
+            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {pageItems.map((f, i) => (
                 <Reveal key={f.match.id} delay={(i % 2) * 0.06} className="min-w-0">
                   <FixtureBlock bundle={f} />
                 </Reveal>
@@ -105,20 +147,7 @@ export default function FixturesPage({ searchParams }: { searchParams: { comp?: 
             </div>
           )}
 
-          {resolved.length > 0 && (
-            <>
-              <h2 className="mb-6 mt-16 font-mono text-xs uppercase tracking-widest text-muted">
-                Settled · scored on-chain ({resolved.length})
-              </h2>
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {resolved.map((f, i) => (
-                  <Reveal key={f.match.id} delay={(i % 2) * 0.06} className="min-w-0">
-                    <FixtureBlock bundle={f} />
-                  </Reveal>
-                ))}
-              </div>
-            </>
-          )}
+          <Pagination page={page} totalPages={totalPages} />
         </>
       )}
     </Container>

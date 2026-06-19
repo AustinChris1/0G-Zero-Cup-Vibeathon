@@ -36,12 +36,12 @@ export function LeaderboardTable({ rows }: { rows: Row[] }) {
             href={`/agents/${row.agent.handle}`}
             className={cn(
               "grid grid-cols-2 items-center gap-3 border-b border-ink-line px-4 py-4 transition-colors hover:bg-ink-soft md:grid-cols-[3rem_1fr_5rem_5rem_5rem_4rem_7rem]",
-              i === 0 && "bg-acid/[0.04]",
+              (row.stats.rank ?? i + 1) === 1 && "bg-acid/[0.04]",
             )}
           >
             <div className="flex items-center gap-2 font-display text-lg font-bold">
-              <span className={cn(i === 0 ? "text-acid" : "text-muted")}>
-                {String(i + 1).padStart(2, "0")}
+              <span className={cn((row.stats.rank ?? i + 1) === 1 ? "text-acid" : "text-muted")}>
+                {String(row.stats.rank ?? i + 1).padStart(2, "0")}
               </span>
             </div>
 
