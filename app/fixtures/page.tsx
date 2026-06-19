@@ -8,53 +8,113 @@ import { Flag } from "@/components/ui/flag";
 import { Reveal } from "@/components/ui/reveal";
 import { fixtureBundles, type FixtureBundle } from "@/lib/queries";
 import { getLastSync } from "@/lib/store";
-import { formatKickoff } from "@/lib/utils";
+import { activeCompetitions } from "@/lib/data/competitions";
+import { cn, formatKickoff } from "@/lib/utils";
 import type { Outcome, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Fixtures // Receipts" };
 
-export default function FixturesPage() {
+export default function FixturesPage({ searchParams }: { searchParams: { comp?: string } }) {
   const all = fixtureBundles();
-  const upcoming = all.filter((f) => f.match.status !== "RESOLVED");
-  const resolved = all.filter((f) => f.match.status === "RESOLVED");
-
   const lastSync = getLastSync();
+  const comps = activeCompetitions();
+
+  // counts per competition for the tabs
+  const countFor = (code: string) =>
+    all.filter((f) => f.match.competition.code === code).length;
+
+  // default to the requested tab, else the first competition that has fixtures,
+  // else the World Cup
+  const withFixtures = comps.find((c) => countFor(c.code) > 0)?.code;
+  const selected = searchParams.comp || withFixtures || "WC";
+
+  const inComp = all.filter((f) => f.match.competition.code === selected);
+  const upcoming = inComp.filter((f) => f.match.status !== "RESOLVED");
+  const resolved = inComp.filter((f) => f.match.status === "RESOLVED");
+  const selectedName = comps.find((c) => c.code === selected)?.name ?? "Fixtures";
 
   return (
     <Container className="py-16">
       <AutoSync lastSync={lastSync} />
       <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
         <SectionHeading
-          kicker="World Cup knockouts"
+          kicker="Competitions"
           title="Fixtures"
           sub="Seal a pick on any upcoming match. The moment you do, it is timestamped on 0G before kickoff and can never change. Resolved matches show how every agent did."
         />
         <SyncButton lastSync={lastSync} />
       </div>
 
-      <h2 className="mb-6 mt-12 font-mono text-xs uppercase tracking-widest text-acid">
-        Upcoming · open for picks
-      </h2>
-      <div className="grid gap-6 lg:grid-cols-2">
-        {upcoming.map((f, i) => (
-          <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
-            <FixtureBlock bundle={f} />
-          </Reveal>
-        ))}
+      {/* competition tabs */}
+      <div className="mt-8 flex flex-wrap gap-2">
+        {comps.map((c) => {
+          const n = countFor(c.code);
+          return (
+            <Link
+              key={c.code}
+              href={`/fixtures?comp=${c.code}`}
+              className={cn(
+                "flex items-center gap-2 border px-3 py-2 font-mono text-xs transition",
+                c.code === selected
+                  ? "border-acid bg-acid/10 text-acid"
+                  : "border-ink-line text-muted hover:border-muted hover:text-chalk",
+              )}
+            >
+              {c.short}
+              <span className={cn("text-[0.6rem]", c.code === selected ? "text-acid/70" : "text-muted/60")}>
+                {n}
+              </span>
+            </Link>
+          );
+        })}
       </div>
 
-      <h2 className="mb-6 mt-16 font-mono text-xs uppercase tracking-widest text-muted">
-        Settled · scored on-chain
-      </h2>
-      <div className="grid gap-6 lg:grid-cols-2">
-        {resolved.map((f, i) => (
-          <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
-            <FixtureBlock bundle={f} />
-          </Reveal>
-        ))}
-      </div>
+      {inComp.length === 0 ? (
+        <div className="mt-10 border border-dashed border-ink-line p-10 text-center">
+          <div className="font-display text-lg font-bold text-chalk">{selectedName} is between seasons</div>
+          <p className="mt-2 font-mono text-xs text-muted">
+            No fixtures in the current window. This tab fills automatically when the
+            schedule is published. The World Cup is live right now.
+          </p>
+          <Link href="/fixtures?comp=WC" className="btn-acid mt-5 inline-block rounded px-4 py-2 text-xs">
+            Go to the World Cup
+          </Link>
+        </div>
+      ) : (
+        <>
+          <h2 className="mb-6 mt-10 font-mono text-xs uppercase tracking-widest text-acid">
+            Upcoming · open for picks ({upcoming.length})
+          </h2>
+          {upcoming.length === 0 ? (
+            <p className="font-mono text-xs text-muted">No upcoming fixtures in this competition right now.</p>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">
+              {upcoming.map((f, i) => (
+                <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
+                  <FixtureBlock bundle={f} />
+                </Reveal>
+              ))}
+            </div>
+          )}
+
+          {resolved.length > 0 && (
+            <>
+              <h2 className="mb-6 mt-16 font-mono text-xs uppercase tracking-widest text-muted">
+                Settled · scored on-chain ({resolved.length})
+              </h2>
+              <div className="grid gap-6 lg:grid-cols-2">
+                {resolved.map((f, i) => (
+                  <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
+                    <FixtureBlock bundle={f} />
+                  </Reveal>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
     </Container>
   );
 }

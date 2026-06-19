@@ -19,8 +19,14 @@ export interface MatchResult {
   outcome: Outcome;
 }
 
+export interface Competition {
+  code: string;
+  name: string;
+}
+
 export interface Match {
   id: string;
+  competition: Competition;
   stage: string;
   home: Team;
   away: Team;
