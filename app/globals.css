@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Instrument Serif", Georgia, serif;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #0b0c0e;
+  color: #f4f0e6;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: #ceff1a;
+  color: #0b0c0e;
+}
+
+/* Custom scrollbar gives the whole thing a machined, intentional feel */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0c0e;
+}
+::-webkit-scrollbar-thumb {
+  background: #23272d;
+  border: 2px solid #0b0c0e;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ceff1a;
+}
+
+@layer components {
+  /* The signature surface of the whole product: a thermal receipt stub. */
+  .receipt {
+    position: relative;
+    background: #f4f0e6;
+    color: #0b0c0e;
+    background-image:
+      repeating-linear-gradient(
+        180deg,
+        transparent,
+        transparent 27px,
+        rgba(11, 12, 14, 0.04) 27px,
+        rgba(11, 12, 14, 0.04) 28px
+      );
+  }
+
+  /* Perforated top + bottom edges, drawn with masks so they cut real holes */
+  .perf-top,
+  .perf-bottom {
+    position: relative;
+  }
+  .perf-top::before,
+  .perf-bottom::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background:
+      radial-gradient(circle at 6px 0, transparent 0 5px, #f4f0e6 5px) repeat-x;
+    background-size: 16px 10px;
+  }
+  .perf-top::before {
+    top: -5px;
+    transform: rotate(180deg);
+  }
+  .perf-bottom::after {
+    bottom: -5px;
+  }
+
+  /* Verification stamp, ink-printed and slightly off-kilter like a real one */
+  .stamp {
+    border: 3px solid currentColor;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+    mix-blend-mode: multiply;
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .btn-acid {
+    background: #ceff1a;
+    color: #0b0c0e;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 2px solid #0b0c0e;
+    box-shadow: 4px 4px 0 0 #0b0c0e;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .btn-acid:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #0b0c0e;
+  }
+  .btn-acid:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 0 #0b0c0e;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: #f4f0e6;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid #23272d;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-ghost:hover {
+    border-color: #ceff1a;
+    color: #ceff1a;
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .hairline {
+    border-color: #23272d;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .font-serif-display {
+    font-family: var(--font-serif);
+  }
+  /* Paper-printed grain overlay for receipt surfaces */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .pause-on-hover:hover {
+    animation-play-state: paused;
+  }
+}

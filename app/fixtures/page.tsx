@@ -1,0 +1,207 @@
+import Link from "next/link";
+import { Container, SectionHeading } from "@/components/ui/section";
+import { PredictPanel } from "@/components/predict-panel";
+import { ResolveControls } from "@/components/resolve-controls";
+import { SyncButton } from "@/components/sync-button";
+import { AutoSync } from "@/components/auto-sync";
+import { Flag } from "@/components/ui/flag";
+import { Reveal } from "@/components/ui/reveal";
+import { fixtureBundles, type FixtureBundle } from "@/lib/queries";
+import { getLastSync } from "@/lib/store";
+import { formatKickoff } from "@/lib/utils";
+import type { Outcome, Team } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Fixtures // Receipts" };
+
+export default function FixturesPage() {
+  const all = fixtureBundles();
+  const upcoming = all.filter((f) => f.match.status !== "RESOLVED");
+  const resolved = all.filter((f) => f.match.status === "RESOLVED");
+
+  const lastSync = getLastSync();
+
+  return (
+    <Container className="py-16">
+      <AutoSync lastSync={lastSync} />
+      <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
+        <SectionHeading
+          kicker="World Cup knockouts"
+          title="Fixtures"
+          sub="Seal a pick on any upcoming match. The moment you do, it is timestamped on 0G before kickoff and can never change. Resolved matches show how every agent did."
+        />
+        <SyncButton lastSync={lastSync} />
+      </div>
+
+      <h2 className="mb-6 mt-12 font-mono text-xs uppercase tracking-widest text-acid">
+        Upcoming · open for picks
+      </h2>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {upcoming.map((f, i) => (
+          <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
+            <FixtureBlock bundle={f} />
+          </Reveal>
+        ))}
+      </div>
+
+      <h2 className="mb-6 mt-16 font-mono text-xs uppercase tracking-widest text-muted">
+        Settled · scored on-chain
+      </h2>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {resolved.map((f, i) => (
+          <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
+            <FixtureBlock bundle={f} />
+          </Reveal>
+        ))}
+      </div>
+    </Container>
+  );
+}
+
+function FixtureBlock({ bundle }: { bundle: FixtureBundle }) {
+  const { match, predictions, unpredicted } = bundle;
+  const resolved = match.status === "RESOLVED" && match.result;
+
+  const consensus = predictions.reduce(
+    (acc, { prediction }) => {
+      acc.HOME += prediction.probs.HOME;
+      acc.DRAW += prediction.probs.DRAW;
+      acc.AWAY += prediction.probs.AWAY;
+      return acc;
+    },
+    { HOME: 0, DRAW: 0, AWAY: 0 },
+  );
+  const n = predictions.length || 1;
+  const cons: Record<Outcome, number> = {
+    HOME: consensus.HOME / n,
+    DRAW: consensus.DRAW / n,
+    AWAY: consensus.AWAY / n,
+  };
+
+  return (
+    <div className="flex h-full flex-col border border-ink-line bg-ink-soft">
+      <div className="border-b border-ink-line p-5">
+        <div className="flex items-center justify-between font-mono text-[0.62rem] uppercase tracking-widest text-muted">
+          <span className="flex items-center gap-2">
+            {match.stage}
+            {match.source === "live" && (
+              <span className="flex items-center gap-1 border border-seal/50 px-1.5 py-0.5 text-[0.55rem] text-seal">
+                <span className="h-1 w-1 rounded-full bg-seal" />
+                live data
+              </span>
+            )}
+          </span>
+          <span>{resolved ? "full time" : formatKickoff(match.kickoff)}</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <Side team={match.home} />
+          {resolved ? (
+            <div className="px-3 font-display text-2xl font-bold text-chalk">
+              {match.result!.home}
+              <span className="px-1 text-muted">:</span>
+              {match.result!.away}
+            </div>
+          ) : (
+            <span className="px-3 font-mono text-sm text-muted">vs</span>
+          )}
+          <Side team={match.away} alignRight />
+        </div>
+        <div className="mt-2 text-center font-mono text-[0.6rem] text-muted">{match.venue}</div>
+      </div>
+
+      {/* consensus */}
+      {predictions.length > 0 && (
+        <div className="border-b border-ink-line px-5 py-3">
+          <div className="mb-2 flex items-center justify-between font-mono text-[0.58rem] uppercase tracking-widest text-muted">
+            <span>field consensus</span>
+            <span>{predictions.length} picks</span>
+          </div>
+          <div className="flex h-2 overflow-hidden rounded-full bg-ink">
+            <span style={{ width: `${cons.HOME * 100}%`, background: "#ceff1a" }} />
+            <span style={{ width: `${cons.DRAW * 100}%`, background: "#8aa0b4" }} />
+            <span style={{ width: `${cons.AWAY * 100}%`, background: "#38e8ff" }} />
+          </div>
+          <div className="mt-1 flex justify-between font-mono text-[0.58rem] text-muted">
+            <span>{match.home.code} {Math.round(cons.HOME * 100)}%</span>
+            <span>DRAW {Math.round(cons.DRAW * 100)}%</span>
+            <span>{match.away.code} {Math.round(cons.AWAY * 100)}%</span>
+          </div>
+        </div>
+      )}
+
+      {/* agent picks */}
+      <div className="flex-1 divide-y divide-ink-line">
+        {predictions.slice(0, 6).map(({ prediction, agent }) => {
+          const pickCode =
+            prediction.pick === "HOME"
+              ? match.home.code
+              : prediction.pick === "AWAY"
+                ? match.away.code
+                : "DRAW";
+          return (
+            <Link
+              key={prediction.id}
+              href={`/receipt/${prediction.id}`}
+              className="flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-ink"
+            >
+              <span
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-sm text-xs"
+                style={{ background: agent.accent, color: "#0b0c0e" }}
+              >
+                {agent.glyph}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-chalk">
+                {agent.name}
+              </span>
+              <span className="font-mono text-xs text-acid">{pickCode}</span>
+              <span className="w-10 text-right font-mono text-xs text-muted">
+                {Math.round(prediction.confidence * 100)}%
+              </span>
+              {prediction.resolved && (
+                <span className={prediction.correct ? "text-[#4ade80]" : "text-seal"}>
+                  {prediction.correct ? "✓" : "✕"}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* controls */}
+      <div className="space-y-3 border-t border-ink-line p-5">
+        {!resolved && <PredictPanel match={match} agents={unpredicted} />}
+        {!resolved && (
+          <div className="flex justify-end">
+            <ResolveControls
+              matchId={match.id}
+              homeCode={match.home.code}
+              awayCode={match.away.code}
+            />
+          </div>
+        )}
+        {resolved && match.result && (
+          <div className="text-center font-mono text-[0.62rem] uppercase tracking-widest text-muted">
+            outcome ·{" "}
+            <span className="text-chalk">
+              {match.result.outcome === "HOME"
+                ? `${match.home.name} win`
+                : match.result.outcome === "AWAY"
+                  ? `${match.away.name} win`
+                  : "draw"}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Side({ team, alignRight }: { team: Team; alignRight?: boolean }) {
+  return (
+    <div className={`flex flex-1 items-center gap-2 ${alignRight ? "flex-row-reverse text-right" : ""}`}>
+      <Flag team={team} className="text-2xl" />
+      <span className="font-display text-sm font-bold leading-tight text-chalk">{team.name}</span>
+    </div>
+  );
+}
