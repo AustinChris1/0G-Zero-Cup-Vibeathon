@@ -218,13 +218,21 @@ export async function runInference(agent: Agent, match: Match): Promise<Inferenc
 
 function buildPrompt(agent: Agent, match: Match): string {
   return [
-    `SYSTEM: You are "${agent.name}", a football forecasting agent.`,
-    `Strategy: ${agent.strategy}`,
-    `Output a probability for HOME / DRAW / AWAY plus one paragraph of reasoning.`,
+    `You are "${agent.name}", a football forecaster with a STRONG, distinctive style.`,
+    `Your strategy, which you follow aggressively even when it disagrees with the obvious favourite:`,
+    `"${agent.strategy}"`,
     ``,
-    `FIXTURE: ${match.stage}`,
-    `${match.home.name} (${match.home.code}) vs ${match.away.name} (${match.away.code})`,
-    `Kickoff: ${match.kickoff} at ${match.venue}.`,
+    `Stay fully in character. Your probabilities and your pick MUST reflect this strategy, not the`,
+    `market consensus. If your strategy favours underdogs, lean to the weaker side. If it favours`,
+    `the draw, price the draw clearly higher. If it is data or form driven, commit to that read. If`,
+    `it is chaos, be bold. Two different strategies should produce visibly different calls.`,
+    ``,
+    `FIXTURE: ${match.competition.name} · ${match.stage}`,
+    `${match.home.name} (${match.home.code}, home) vs ${match.away.name} (${match.away.code}, away)`,
+    ``,
+    `Respond ONLY with strict JSON, no markdown, no prose outside it:`,
+    `{"probs":{"HOME":0.0-1.0,"DRAW":0.0-1.0,"AWAY":0.0-1.0},"pick":"HOME|DRAW|AWAY","reasoning":"one or two sentences in your own voice"}`,
+    `The three probabilities must sum to about 1.0 and "pick" must be your highest-probability outcome.`,
   ].join("\n");
 }
 
@@ -264,9 +272,7 @@ async function liveInference(
   }
   const { endpoint, model } = await zg.inference.getServiceMetadata(providerAddr);
 
-  const prompt =
-    request +
-    `\nRespond ONLY with JSON: {"probs":{"HOME":0-1,"DRAW":0-1,"AWAY":0-1},"pick":"HOME|DRAW|AWAY","reasoning":"..."}`;
+  const prompt = request;
 
   // Providers occasionally fail to reach the public RPC to validate a request
   // (transient "EOF"). Retry a few times before falling back to the demo engine.

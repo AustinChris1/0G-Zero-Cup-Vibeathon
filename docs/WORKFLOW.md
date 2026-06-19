@@ -100,29 +100,36 @@ This is exactly what the "Attack this receipt" button demonstrates live.
 
 ---
 
-## Demo mode vs live mode
+## Live mode vs demo mode
 
-| | Demo mode (default) | Live mode |
+The deployed app runs **live**. Demo mode exists as a zero-config fallback so the
+proof works with no keys at all.
+
+| leg | demo mode | live mode (deployed) |
 | --- | --- | --- |
-| Inference | local strategy engine | 0G Compute (Sealed Inference) |
-| Signature | real ECDSA enclave key | 0G TEE provider key |
-| Storage | content-hash + local blob | 0G Storage indexer |
-| Settlement | deterministic tx hash | 0G Chain contract |
+| Inference | local strategy engine | 0G Compute Sealed Inference (`qwen/qwen2.5-omni-7b`, TEE) |
+| Signature | real ECDSA enclave key | app enclave key, with the response TEE-verified via `processResponse` |
+| Storage | content-hash + local blob | real 0G Storage upload (merkle root + on-chain tx) |
+| Settlement | deterministic tx hash | 0G Chain |
 | Verification math | identical | identical |
 
-The verification is real in both modes. Demo mode only swaps the *source* of the
-signature, not the checking. That is why the tamper demo works offline with no keys.
+The verification is real in both modes; demo mode only swaps the *source* of the data,
+not the checking. That is why the tamper demo works offline with no keys.
 
-Switch with `OG_MODE=live` plus a funded `OG_PRIVATE_KEY` (see `.env.example`).
+Per-leg control (`lib/og/mode.ts`): `OG_MODE=live` plus a funded `OG_PRIVATE_KEY` turns on
+real storage; `OG_COMPUTE=on` turns on real inference (its ledger needs a 3 OG minimum).
 
 ---
 
-## Real World Cup data (optional, hybrid)
+## Real data, multiple competitions
 
-With an `API_FOOTBALL_KEY` set, the Fixtures page can pull real 2026 fixtures and
-results. New fixtures appear tagged `live data`, finished matches auto-score, and a
-few agents auto-seal picks so the field looks alive. No key, API down, or rate
-limited, and it silently stays on the curated seed. See `lib/sync.ts`.
+Fixtures and results are pulled live from football-data.org (`lib/data/`). The app is
+competition-agnostic: `lib/data/competitions.ts` lists the World Cup plus the Champions
+League, Premier League, La Liga, Serie A, Bundesliga and Ligue 1, all on the free tier.
+The Fixtures page has a tab per competition. A server-side TTL plus an in-flight lock keep
+real API calls to at most one per window no matter the traffic (`lib/sync.ts`). There is no
+mock data: the seed is agents-only, and picks are sealed real via `scripts/seal-batch.cjs`
+or interactively in the UI. Leaderboard results fill in as real matches resolve.
 
 ---
 
@@ -132,9 +139,10 @@ limited, and it silently stays on the curated seed. See `lib/sync.ts`.
 app/                 pages + API routes
 lib/og/              the 0G integration and crypto (the core)
 lib/scoring.ts       Brier, calibration, leaderboard ranking
-lib/seed.ts          the curated bracket + agents + history
-lib/data/            API-Football client (real data)
+lib/seed.ts          agent personas only (no mock matches/picks)
+lib/data/            football data layer (multi-competition) + competitions config
 lib/store.ts         file-backed store
+scripts/             faucet wallet helpers + real-pick batch sealer
 contracts/           Leaderboard.sol (on-chain settlement)
 components/          all UI
 ```

@@ -19,11 +19,17 @@ export const metadata = { title: "Fixtures // Receipts" };
 export default function FixturesPage({ searchParams }: { searchParams: { comp?: string } }) {
   const all = fixtureBundles();
   const lastSync = getLastSync();
-  const comps = activeCompetitions();
 
   // counts per competition for the tabs
   const countFor = (code: string) =>
     all.filter((f) => f.match.competition.code === code).length;
+
+  // Show competitions that have fixtures first, but keep the World Cup leading.
+  const comps = [...activeCompetitions()].sort((a, b) => {
+    if (a.code === "WC") return -1;
+    if (b.code === "WC") return 1;
+    return countFor(b.code) - countFor(a.code);
+  });
 
   // default to the requested tab, else the first competition that has fixtures,
   // else the World Cup
