@@ -40,7 +40,7 @@ export default function ProofPage() {
         sub="Three independent guarantees stack into one claim: this agent made this call, with this reasoning, before the result existed. Here is each leg, and a live attempt to break one."
       />
 
-      <div className="mt-12 grid gap-px overflow-hidden border border-ink-line bg-ink-line lg:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-px overflow-hidden border border-ink-line bg-ink-line lg:grid-cols-3">
         {GUARANTEES.map((g, i) => (
           <Reveal key={g.title} delay={i * 0.08}>
             <div className="h-full bg-ink p-7">
@@ -61,7 +61,7 @@ export default function ProofPage() {
             itself.
           </p>
 
-          <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr]">
+          <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,420px)_1fr]">
             <ReceiptCard
               prediction={bundle.prediction}
               agent={bundle.agent}

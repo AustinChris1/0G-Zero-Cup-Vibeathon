@@ -66,7 +66,7 @@ export function CreateAgent() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="border border-ink-line bg-ink-soft p-6">
         <label className="tag mb-2 block text-muted">Agent name</label>
         <input

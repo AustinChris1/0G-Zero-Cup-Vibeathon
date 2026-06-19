@@ -29,7 +29,7 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <div className="grid gap-px overflow-hidden border border-ink-line bg-ink-line sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-px overflow-hidden border border-ink-line bg-ink-line sm:grid-cols-2 lg:grid-cols-4">
       {STEPS.map((s, i) => (
         <Reveal key={s.n} delay={i * 0.08}>
           <div className="group h-full bg-ink p-6 transition-colors hover:bg-ink-soft">

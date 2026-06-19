@@ -8,7 +8,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-ink-line bg-ink-soft">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
-        <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
           <div>
             <div className="flex items-baseline gap-1">
               <span className="font-display text-2xl font-bold tracking-tightest">RECEIPTS</span>

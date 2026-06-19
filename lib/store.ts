@@ -4,6 +4,12 @@ import path from "path";
 import type { Agent, Database, Match, Outcome, Prediction } from "./types";
 import { brierScore } from "./scoring";
 import { buildSeed } from "./seed";
+import snapshotJson from "../data/snapshot.json";
+
+// Bundled real-data snapshot (real fixtures + sealed receipts + proof blobs).
+// On serverless where there is no writable store yet, this is the baseline so
+// every instance shows real data consistently. Regenerate with: npm run snapshot
+const SNAPSHOT = snapshotJson as unknown as Database;
 
 // On serverless (Vercel) the project dir is read-only; only the temp dir is
 // writable. Locally we use ./data so state persists across restarts.
@@ -26,29 +32,42 @@ export function getBlob(root: string): string | null {
   return blobMap()[root] ?? null;
 }
 
+// Prefer the bundled snapshot (real fixtures + picks) when there is no writable
+// store yet; fall back to agents-only seed if the snapshot is empty.
+function fallbackDb(): Database {
+  if (SNAPSHOT && Array.isArray(SNAPSHOT.matches) && SNAPSHOT.matches.length > 0) {
+    return JSON.parse(JSON.stringify(SNAPSHOT)) as Database;
+  }
+  return buildSeed();
+}
+
 function load(): Database {
   const g = globalThis as unknown as { __receiptsDb?: Database };
   if (g.__receiptsDb) return g.__receiptsDb;
 
   let db: Database;
+  let fromDisk = false;
   try {
     if (fs.existsSync(DB_PATH)) {
       db = JSON.parse(fs.readFileSync(DB_PATH, "utf8")) as Database;
+      fromDisk = true;
     } else {
-      db = buildSeed();
-      persist(db);
+      db = fallbackDb();
     }
   } catch (err) {
-    console.error("[store] load failed, rebuilding from seed:", err);
-    db = buildSeed();
+    console.error("[store] load failed, using fallback:", err);
+    db = fallbackDb();
   }
 
-  // Hydrate the blob map from whatever the DB carries.
+  // Hydrate the blob map from whatever the DB carries, BEFORE any persist (so
+  // persist, which snapshots the blob map back onto the DB, does not wipe them).
   const blobs = blobMap();
   for (const [k, v] of Object.entries(db.blobs ?? {})) blobs[k] = v;
   db.blobs = blobs;
 
   g.__receiptsDb = db;
+  // Persist the fallback so subsequent reads on this instance are fast.
+  if (!fromDisk) persist(db);
   return db;
 }
 

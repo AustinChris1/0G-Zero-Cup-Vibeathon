@@ -19,7 +19,7 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
         ← {agent.name}
       </Link>
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr]">
+      <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div>
           <ReceiptCard
             prediction={prediction}

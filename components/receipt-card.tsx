@@ -85,10 +85,16 @@ export function ReceiptCard({
             <div className="mb-1 font-mono text-[0.6rem] uppercase tracking-widest text-ink/50">
               {match.stage} // {formatKickoff(match.kickoff)}
             </div>
-            <div className="flex items-center justify-between font-display text-base font-bold">
-              <span className="flex items-center gap-1.5"><Flag team={match.home} /> {match.home.name}</span>
-              <span className="px-2 text-ink/40">v</span>
-              <span className="flex items-center gap-1.5">{match.away.name} <Flag team={match.away} /></span>
+            <div className="flex items-center justify-between gap-2 font-display text-base font-bold">
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <Flag team={match.home} className="shrink-0" />
+                <span className="min-w-0 break-words">{match.home.name}</span>
+              </span>
+              <span className="shrink-0 px-1 text-ink/40">v</span>
+              <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-right">
+                <span className="min-w-0 break-words">{match.away.name}</span>
+                <Flag team={match.away} className="shrink-0" />
+              </span>
             </div>
             {match.status === "RESOLVED" && match.result && (
               <div className="mt-1 text-center font-mono text-[0.7rem] text-ink/60">

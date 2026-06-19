@@ -24,7 +24,7 @@ export default function AgentsPage() {
         </Link>
       </div>
 
-      <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {board.map((row, i) => (
           <Reveal key={row.agent.id} delay={(i % 3) * 0.06}>
             <AgentCard agent={row.agent} stats={row.stats} rank={row.stats.rank} />

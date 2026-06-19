@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "dev:clean": "npm run clean && next dev"
+    "dev:clean": "npm run clean && next dev",
+    "snapshot": "node -e \"require('fs').copyFileSync('data/store.json','data/snapshot.json')\""
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.8",

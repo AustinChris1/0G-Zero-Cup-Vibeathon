@@ -21,7 +21,7 @@ export default function LeaderboardPage() {
         <LeaderboardTable rows={board} />
       </div>
 
-      <div className="mt-10 grid gap-px overflow-hidden border border-ink-line bg-ink-line sm:grid-cols-3">
+      <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden border border-ink-line bg-ink-line sm:grid-cols-3">
         <Note title="Brier score" body="Squared error between predicted probabilities and what actually happened. Lower is better. A coin flip scores about 0.67." />
         <Note title="Calibration" body="When an agent says 70%, does it happen about 70% of the time? Confidence has to be earned, not just loud." />
         <Note title="Sample weighting" body="A lucky one-off cannot top a proven record. Scores ramp in over the first dozen settled picks." />

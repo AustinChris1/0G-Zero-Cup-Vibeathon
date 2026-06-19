@@ -96,9 +96,9 @@ export default function FixturesPage({ searchParams }: { searchParams: { comp?: 
           {upcoming.length === 0 ? (
             <p className="font-mono text-xs text-muted">No upcoming fixtures in this competition right now.</p>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {upcoming.map((f, i) => (
-                <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
+                <Reveal key={f.match.id} delay={(i % 2) * 0.06} className="min-w-0">
                   <FixtureBlock bundle={f} />
                 </Reveal>
               ))}
@@ -110,9 +110,9 @@ export default function FixturesPage({ searchParams }: { searchParams: { comp?: 
               <h2 className="mb-6 mt-16 font-mono text-xs uppercase tracking-widest text-muted">
                 Settled · scored on-chain ({resolved.length})
               </h2>
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {resolved.map((f, i) => (
-                  <Reveal key={f.match.id} delay={(i % 2) * 0.06}>
+                  <Reveal key={f.match.id} delay={(i % 2) * 0.06} className="min-w-0">
                     <FixtureBlock bundle={f} />
                   </Reveal>
                 ))}
@@ -146,34 +146,34 @@ function FixtureBlock({ bundle }: { bundle: FixtureBundle }) {
   };
 
   return (
-    <div className="flex h-full flex-col border border-ink-line bg-ink-soft">
-      <div className="border-b border-ink-line p-5">
-        <div className="flex items-center justify-between font-mono text-[0.62rem] uppercase tracking-widest text-muted">
-          <span className="flex items-center gap-2">
-            {match.stage}
+    <div className="flex h-full min-w-0 flex-col overflow-hidden border border-ink-line bg-ink-soft">
+      <div className="border-b border-ink-line p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2 font-mono text-[0.62rem] uppercase tracking-widest text-muted">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{match.stage}</span>
             {match.source === "live" && (
-              <span className="flex items-center gap-1 border border-seal/50 px-1.5 py-0.5 text-[0.55rem] text-seal">
+              <span className="flex shrink-0 items-center gap-1 border border-seal/50 px-1.5 py-0.5 text-[0.55rem] text-seal">
                 <span className="h-1 w-1 rounded-full bg-seal" />
-                live data
+                live
               </span>
             )}
           </span>
-          <span>{resolved ? "full time" : formatKickoff(match.kickoff)}</span>
+          <span className="shrink-0">{resolved ? "full time" : formatKickoff(match.kickoff)}</span>
         </div>
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <Side team={match.home} />
           {resolved ? (
-            <div className="px-3 font-display text-2xl font-bold text-chalk">
+            <div className="shrink-0 px-1 font-display text-2xl font-bold text-chalk">
               {match.result!.home}
               <span className="px-1 text-muted">:</span>
               {match.result!.away}
             </div>
           ) : (
-            <span className="px-3 font-mono text-sm text-muted">vs</span>
+            <span className="shrink-0 px-1 font-mono text-sm text-muted">vs</span>
           )}
           <Side team={match.away} alignRight />
         </div>
-        <div className="mt-2 text-center font-mono text-[0.6rem] text-muted">{match.venue}</div>
+        <div className="mt-2 truncate text-center font-mono text-[0.6rem] text-muted">{match.venue}</div>
       </div>
 
       {/* consensus */}
@@ -265,9 +265,13 @@ function FixtureBlock({ bundle }: { bundle: FixtureBundle }) {
 
 function Side({ team, alignRight }: { team: Team; alignRight?: boolean }) {
   return (
-    <div className={`flex flex-1 items-center gap-2 ${alignRight ? "flex-row-reverse text-right" : ""}`}>
-      <Flag team={team} className="text-2xl" />
-      <span className="font-display text-sm font-bold leading-tight text-chalk">{team.name}</span>
+    <div
+      className={`flex min-w-0 flex-1 items-center gap-2 ${alignRight ? "flex-row-reverse text-right" : ""}`}
+    >
+      <Flag team={team} className="shrink-0 text-xl sm:text-2xl" />
+      <span className="min-w-0 break-words font-display text-sm font-bold leading-tight text-chalk">
+        {team.name}
+      </span>
     </div>
   );
 }

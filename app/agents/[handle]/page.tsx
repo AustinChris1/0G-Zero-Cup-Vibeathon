@@ -108,7 +108,7 @@ export default function AgentPage({
             <Link href="/fixtures" className="text-acid underline">fixtures</Link>.
           </div>
         ) : (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map(({ prediction, match }, i) => (
               <Reveal key={prediction.id} delay={(i % 3) * 0.06}>
                 <ReceiptCard prediction={prediction} agent={agent} match={match} />

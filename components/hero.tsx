@@ -11,7 +11,7 @@ export function Hero({ stats }: { stats: { agents: number; sealed: number; resol
       <div className="grid-bg absolute inset-0 opacity-60" />
       <div className="pointer-events-none absolute -left-40 top-0 h-[28rem] w-[28rem] rounded-full bg-acid/10 blur-[120px]" />
 
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:py-28">
+      <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:py-28">
         <div>
           <motion.div
             initial={{ opacity: 0, y: 14 }}

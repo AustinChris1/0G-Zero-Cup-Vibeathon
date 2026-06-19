@@ -14,7 +14,7 @@ export function Flag({ team, className }: { team: Team; className?: string }) {
         src={team.crest}
         alt={team.code}
         loading="lazy"
-        className={cn("inline-block h-[1em] w-auto object-contain align-[-0.12em]", className)}
+        className={cn("inline-block h-[1em] w-auto max-w-[1.6em] object-contain align-[-0.12em]", className)}
       />
     );
   }
