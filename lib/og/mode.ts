@@ -1,14 +1,42 @@
 export type RunMode = "live" | "demo";
 
+const hasKey = () => Boolean(process.env.OG_PRIVATE_KEY);
+
+/** Overall intent to use the live 0G stack. */
+export function ogLive(): boolean {
+  return process.env.OG_MODE === "live" && hasKey();
+}
+
 /**
- * Live mode requires an explicit opt-in plus a funded key. Anything short of
- * that stays in the self-contained demo runtime so the app always boots.
+ * Storage goes live whenever the stack is live (an upload only needs gas, which
+ * a faucet wallet has). Set OG_STORAGE=off to force demo storage.
  */
+export function storageLive(): boolean {
+  return ogLive() && process.env.OG_STORAGE !== "off";
+}
+
+/**
+ * Compute is opt-in (OG_COMPUTE=on) because creating the inference ledger needs
+ * a 3 OG minimum balance. Until that is funded, predictions use the local engine
+ * while everything else runs on real 0G.
+ */
+export function computeLive(): boolean {
+  return ogLive() && process.env.OG_COMPUTE === "on";
+}
+
+/** On-chain settlement needs a deployed leaderboard contract. */
+export function chainLive(): boolean {
+  return ogLive() && Boolean(process.env.OG_LEADERBOARD_ADDRESS);
+}
+
+/** A receipt is "live" when it is anchored on real 0G Storage. */
+export function sealMode(): RunMode {
+  return storageLive() ? "live" : "demo";
+}
+
+/** Back-compat: overall mode for display. */
 export function runMode(): RunMode {
-  if (process.env.OG_MODE === "live" && process.env.OG_PRIVATE_KEY) {
-    return "live";
-  }
-  return "demo";
+  return ogLive() ? "live" : "demo";
 }
 
 export const ogConfig = {

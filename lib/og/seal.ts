@@ -3,7 +3,7 @@ import { canonicalPayload, enclaveSign, hashPayload, keccakOf } from "./crypto";
 import { buildStoredReceipt, serializeReceipt } from "./document";
 import { demoInference, runInference, type InferenceResult } from "./compute";
 import { storeReceipt, storeReceiptSync } from "./storage";
-import { runMode } from "./mode";
+import { sealMode } from "./mode";
 
 function predictionId(agentId: string, matchId: string, createdAt: string): string {
   return "rcpt_" + keccakOf(agentId + matchId + createdAt).slice(2, 14);
@@ -79,12 +79,12 @@ export async function sealPrediction(agent: Agent, match: Match): Promise<Predic
     signer,
     payloadHash,
     sealedAt: createdAt,
-    mode: runMode(),
+    mode: sealMode(),
   });
   const storage = await storeReceipt(serializeReceipt(doc));
 
   return assemble(
-    agent, match, inf, createdAt, storage, signature, signer, payloadHash, runMode(),
+    agent, match, inf, createdAt, storage, signature, signer, payloadHash, sealMode(),
   );
 }
 

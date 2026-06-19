@@ -32,11 +32,13 @@ export async function POST(req: Request) {
         : "HOME";
 
   // Forge a tampered copy: change the pick and reasoning, keep the original seal.
+  // Modify the raw response as a string (it may be markdown-fenced JSON from a
+  // live model, so do not assume it parses).
   const tampered: Prediction = {
     ...original,
     pick: flipped,
     reasoning: original.reasoning.replace(/\b\d{1,3}%/, "99%") + " [edited after the fact]",
-    response: JSON.stringify({ ...JSON.parse(original.response || "{}"), pick: flipped }),
+    response: `${original.response}\n[forged: pick changed to ${flipped}]`,
   };
 
   // Play the sophisticated forger: recompute the digest so the content matches

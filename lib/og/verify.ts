@@ -83,19 +83,25 @@ export async function verifyPrediction(
     sealedAt: seal.sealedAt,
     mode: seal.mode,
   });
-  const localRoot = keccakOf(serializeReceipt(doc));
-  // The presented content must hash to the claimed root...
-  let storageOk = localRoot === seal.storageRoot;
-  // ...and must equal the copy actually held in 0G Storage.
+  const docStr = serializeReceipt(doc);
+  // Fetch the copy actually stored under this root (0G download, or local cache).
+  // The presented receipt must be byte-identical to what is stored. This works
+  // regardless of how the root was derived (keccak for demo, merkle for live 0G).
   const stored = await fetchReceipt(seal.storageRoot);
-  if (stored) storageOk = storageOk && keccakOf(stored) === localRoot;
+  let storageOk: boolean;
+  if (stored !== null) {
+    storageOk = stored === docStr;
+  } else {
+    // No retrievable copy: fall back to the demo-style content hash check.
+    storageOk = keccakOf(docStr) === seal.storageRoot;
+  }
   steps.push({
     key: "storage",
     label: "0G Storage root",
     ok: storageOk,
     detail: storageOk
-      ? `Stored receipt re-hashes to root ${seal.storageRoot.slice(0, 12)}…`
-      : "Stored document does not match its root hash.",
+      ? `Receipt matches the copy stored on 0G at ${seal.storageRoot.slice(0, 12)}…`
+      : "Stored copy does not match this receipt.",
   });
 
   // 4. Timing: the seal was committed before the match could be known.

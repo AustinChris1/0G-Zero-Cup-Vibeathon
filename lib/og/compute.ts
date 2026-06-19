@@ -1,6 +1,6 @@
 import type { Agent, Match, Outcome, Probabilities } from "../types";
 import { topPick } from "../scoring";
-import { runMode, ogConfig } from "./mode";
+import { computeLive, ogConfig } from "./mode";
 
 export interface InferenceResult {
   probs: Probabilities;
@@ -206,7 +206,7 @@ export function demoInference(agent: Agent, match: Match): InferenceResult {
 }
 
 export async function runInference(agent: Agent, match: Match): Promise<InferenceResult> {
-  if (runMode() === "live") {
+  if (computeLive()) {
     try {
       return await liveInference(agent, match, buildPrompt(agent, match));
     } catch (err) {
@@ -229,6 +229,9 @@ function buildPrompt(agent: Agent, match: Match): string {
 }
 
 /* ----------------------------- live 0G Compute ----------------------------- */
+let ledgerReady = false;
+const acknowledged = new Set<string>();
+
 async function liveInference(
   agent: Agent,
   match: Match,
@@ -243,29 +246,61 @@ async function liveInference(
   const wallet = new ethers.Wallet(process.env.OG_PRIVATE_KEY as string, provider);
   const zg = await broker.createZGComputeNetworkBroker(wallet);
 
+  // Ensure the inference ledger exists (min 3 OG to create). Done once per boot.
+  if (!ledgerReady) {
+    try {
+      await zg.ledger.getLedger();
+    } catch {
+      const amount = Number(process.env.OG_LEDGER_OG || 3);
+      await zg.ledger.addLedger(amount);
+    }
+    ledgerReady = true;
+  }
+
   const providerAddr = ogConfig.provider;
-  await zg.inference.acknowledgeProviderSigner(providerAddr).catch(() => {});
+  if (!acknowledged.has(providerAddr)) {
+    await zg.inference.acknowledgeProviderSigner(providerAddr).catch(() => {});
+    acknowledged.add(providerAddr);
+  }
   const { endpoint, model } = await zg.inference.getServiceMetadata(providerAddr);
 
   const prompt =
     request +
     `\nRespond ONLY with JSON: {"probs":{"HOME":0-1,"DRAW":0-1,"AWAY":0-1},"pick":"HOME|DRAW|AWAY","reasoning":"..."}`;
-  const headers = await zg.inference.getRequestHeaders(providerAddr, prompt);
 
-  const res = await fetch(`${endpoint}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  const data = await res.json();
-  const chatId = res.headers.get("ZG-Res-Key") || data.id;
-  const content: string = data.choices?.[0]?.message?.content ?? "{}";
+  // Providers occasionally fail to reach the public RPC to validate a request
+  // (transient "EOF"). Retry a few times before falling back to the demo engine.
+  let chatId = "";
+  let content = "";
+  let lastErr = "";
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const headers = await zg.inference.getRequestHeaders(providerAddr, prompt);
+    const res = await fetch(`${endpoint}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 400,
+      }),
+    });
+    const data = await res.json();
+    const got = data?.choices?.[0]?.message?.content;
+    if (got && !data.error) {
+      chatId = res.headers.get("ZG-Res-Key") || data.id || "";
+      content = got;
+      break;
+    }
+    lastErr = JSON.stringify(data?.error ?? data).slice(0, 160);
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  if (!content) throw new Error("provider returned no content: " + lastErr);
 
-  // Settle + verify the TEE signature for this response.
-  await zg.inference.processResponse(providerAddr, chatId, content).catch(() => {});
+  // Verify the TEE signature for this response.
+  const teeVerified = await zg.inference
+    .processResponse(providerAddr, chatId, content)
+    .catch(() => false);
+  console.log("[0G Compute] response received, TEE verified:", teeVerified);
 
   const parsed = safeParse(content);
   const probs = normalize(parsed.probs);

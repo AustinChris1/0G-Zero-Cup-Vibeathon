@@ -6,6 +6,7 @@
 next-env.d.ts
 .env
 .env.local
+.faucet-wallets.json
 /data/store.json
 .DS_Store
 npm-debug.log*

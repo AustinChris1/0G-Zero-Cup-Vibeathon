@@ -1,5 +1,5 @@
 import { keccakOf, demoTxHash } from "./crypto";
-import { runMode, ogConfig } from "./mode";
+import { storageLive, ogConfig } from "./mode";
 import { putBlob, getBlob } from "../store";
 
 export interface StorageWrite {
@@ -18,11 +18,11 @@ export interface StorageWrite {
 export async function storeReceipt(content: string): Promise<StorageWrite> {
   const root = keccakOf(content);
 
-  if (runMode() === "live") {
+  if (storageLive()) {
     try {
-      const tx = await liveUpload(content, root);
-      putBlob(root, content);
-      return { root, tx };
+      const live = await liveUpload(content);
+      putBlob(live.root, content);
+      return live;
     } catch (err) {
       console.error("[0G Storage] live upload failed, falling back:", err);
     }
@@ -43,7 +43,7 @@ export async function fetchReceipt(root: string): Promise<string | null> {
   const local = getBlob(root);
   if (local) return local;
 
-  if (runMode() === "live") {
+  if (storageLive()) {
     try {
       return await liveDownload(root);
     } catch (err) {
@@ -55,7 +55,7 @@ export async function fetchReceipt(root: string): Promise<string | null> {
 
 /* --------------------------- live 0G Storage --------------------------- */
 
-async function liveUpload(content: string, _root: string): Promise<string> {
+async function liveUpload(content: string): Promise<StorageWrite> {
   // Loaded lazily so the base app installs without the optional SDK.
   // @ts-ignore optional dependency, only installed for live mode
   const sdk: any = await import("@0gfoundation/0g-ts-sdk").catch(() => null);
@@ -70,10 +70,15 @@ async function liveUpload(content: string, _root: string): Promise<string> {
   const file = new sdk.MemData(data);
   const [tree, treeErr] = await file.merkleTree();
   if (treeErr) throw treeErr;
+  const root: string = tree.rootHash();
 
-  const [tx, err] = await indexer.upload(file, ogConfig.rpc, signer);
+  const [res, err] = await indexer.upload(file, ogConfig.rpc, signer);
   if (err) throw err;
-  return typeof tx === "string" ? tx : tx?.txHash ?? tree?.rootHash() ?? "0x";
+  const tx =
+    typeof res === "string"
+      ? res
+      : res?.txHash ?? res?.tx ?? res?.transactionHash ?? root;
+  return { root, tx };
 }
 
 async function liveDownload(root: string): Promise<string | null> {

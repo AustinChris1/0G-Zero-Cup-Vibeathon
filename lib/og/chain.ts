@@ -1,5 +1,5 @@
 import { keccakOf } from "./crypto";
-import { runMode, ogConfig } from "./mode";
+import { chainLive, ogConfig } from "./mode";
 
 /**
  * On-chain settlement of a resolved match. In live mode this would write the
@@ -11,7 +11,7 @@ export async function settleResult(
   matchId: string,
   outcome: string,
 ): Promise<string> {
-  if (runMode() === "live" && ogConfig.leaderboard) {
+  if (chainLive()) {
     try {
       return await pushOnChain(matchId, outcome);
     } catch (err) {

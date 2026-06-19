@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { runMode } from "@/lib/og/mode";
+import { computeLive, storageLive, ogLive } from "@/lib/og/mode";
 
 export function SiteFooter() {
-  const mode = runMode();
+  const live = ogLive();
+  const compute = computeLive();
+  const storage = storageLive();
   return (
     <footer className="mt-24 border-t border-ink-line bg-ink-soft">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
@@ -31,16 +33,16 @@ export function SiteFooter() {
           <div>
             <div className="tag mb-3 text-muted">Runtime</div>
             <ul className="space-y-2 font-mono text-xs text-muted">
-              <li>0G Compute · Sealed Inference</li>
-              <li>0G Storage · immutable receipts</li>
+              <li>0G Compute · Sealed Inference {compute ? "· live" : ""}</li>
+              <li>0G Storage · immutable receipts {storage ? "· live" : ""}</li>
               <li>0G Chain · trustless settlement</li>
               <li className="pt-2">
                 <span
                   className="inline-flex items-center gap-1.5 border border-ink-line px-2 py-1"
-                  style={{ color: mode === "live" ? "#4ade80" : "#ceff1a" }}
+                  style={{ color: live ? "#4ade80" : "#ceff1a" }}
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {mode === "live" ? "LIVE 0G RUNTIME" : "DEMO RUNTIME"}
+                  {live ? "LIVE ON 0G" : "DEMO RUNTIME"}
                 </span>
               </li>
             </ul>
