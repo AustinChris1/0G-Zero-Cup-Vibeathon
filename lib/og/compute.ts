@@ -1,4 +1,4 @@
-import type { Agent, Match, Outcome, Probabilities } from "../types";
+import type { Agent, Match, Outcome, Probabilities, Scoreline } from "../types";
 import { topPick } from "../scoring";
 import { computeLive, ogConfig } from "./mode";
 
@@ -6,6 +6,7 @@ export interface InferenceResult {
   probs: Probabilities;
   pick: Outcome;
   confidence: number;
+  scoreline: Scoreline;
   reasoning: string;
   request: string;
   response: string;
@@ -78,9 +79,48 @@ function deriveStyle(strategy: string): Style {
   };
 }
 
+// A blunt, concrete instruction per archetype so a small model actually leans
+// into the strategy instead of defaulting to the obvious favourite.
+function personaDirective(strategy: string): string {
+  const style = deriveStyle(strategy);
+  const lines: string[] = [];
+  if (style.label === "contrarian" || style.underdogBias > 0) {
+    lines.push(
+      "You hunt upsets. Shade probability toward the WEAKER side well beyond the market: give the underdog noticeably more chance than consensus, and predict a tight, low-margin scoreline. Do not just rubber-stamp the favourite.",
+    );
+  }
+  if (style.label === "model-driven") {
+    lines.push(
+      "You are a cold xG/data modeller. Be calibrated, avoid extreme confidence, and base the call on shot quality and expected goals. Predict a realistic, low-variance scoreline.",
+    );
+  }
+  if (style.label === "intuition-led") {
+    lines.push(
+      "You forecast on instinct and tournament energy. Be bold: be willing to call upsets and unusual scorelines that a cautious model would never pick.",
+    );
+  }
+  if (style.drawBias > 0) {
+    lines.push(
+      "You believe tight, low-scoring football wins tournaments. Price the DRAW as a top outcome (often your pick) and predict a low score such as 0-0 or 1-1.",
+    );
+  }
+  if (style.homeBias > 0) {
+    lines.push(
+      "You back the home side and crowd hard: lean clearly toward the home team and a home win.",
+    );
+  }
+  if (lines.length === 0) {
+    lines.push(
+      "Read the game on its merits, weighing form, rest and matchups. Keep the draw genuinely live.",
+    );
+  }
+  return lines.join(" ");
+}
+
 /* ------------------------------ the forecast ------------------------------ */
 function forecast(agent: Agent, match: Match): {
   probs: Probabilities;
+  scoreline: Scoreline;
   reasoning: string;
 } {
   const style = deriveStyle(agent.strategy);
@@ -131,7 +171,21 @@ function forecast(agent: Agent, match: Match): {
   };
   probs = roundProbs(probs);
 
-  return { probs, reasoning: writeReasoning(agent, match, probs, style, rng) };
+  const scoreline = predictScore(topPick(probs), style, rng);
+  return { probs, scoreline, reasoning: writeReasoning(agent, match, probs, style, rng) };
+}
+
+// A plausible full-time scoreline consistent with the pick and the style.
+function predictScore(pick: Outcome, style: Style, rng: () => number): Scoreline {
+  const lowScoring = style.drawBias > 0; // defensive agents lean to tighter games
+  const big = () => (rng() < (lowScoring ? 0.15 : 0.35) ? 1 : 0); // chance of an extra goal
+  if (pick === "DRAW") {
+    const g = rng() < (lowScoring ? 0.55 : 0.35) ? (rng() < 0.5 ? 0 : 1) : 1 + big();
+    return { home: g, away: g };
+  }
+  const winner = 1 + (rng() < 0.5 ? 1 : 0) + big(); // 1..3
+  const loser = rng() < (lowScoring ? 0.65 : 0.4) ? 0 : 1;
+  return pick === "HOME" ? { home: winner, away: loser } : { home: loser, away: winner };
 }
 
 function roundProbs(p: Probabilities): Probabilities {
@@ -190,13 +244,14 @@ function writeReasoning(
 /* ------------------------------ public API ------------------------------ */
 export function demoInference(agent: Agent, match: Match): InferenceResult {
   const request = buildPrompt(agent, match);
-  const { probs, reasoning } = forecast(agent, match);
+  const { probs, scoreline, reasoning } = forecast(agent, match);
   const pick = topPick(probs);
-  const response = JSON.stringify({ probs, pick, reasoning });
+  const response = JSON.stringify({ probs, pick, score: scoreline, reasoning });
   return {
     probs,
     pick,
     confidence: Math.max(probs.HOME, probs.DRAW, probs.AWAY),
+    scoreline,
     reasoning,
     request,
     response,
@@ -222,17 +277,19 @@ function buildPrompt(agent: Agent, match: Match): string {
     `Your strategy, which you follow aggressively even when it disagrees with the obvious favourite:`,
     `"${agent.strategy}"`,
     ``,
-    `Stay fully in character. Your probabilities and your pick MUST reflect this strategy, not the`,
-    `market consensus. If your strategy favours underdogs, lean to the weaker side. If it favours`,
-    `the draw, price the draw clearly higher. If it is data or form driven, commit to that read. If`,
-    `it is chaos, be bold. Two different strategies should produce visibly different calls.`,
+    `Stay fully in character. Your probabilities, pick and score MUST reflect this strategy, not the`,
+    `market consensus. Two different strategies should produce visibly different numbers.`,
+    `How you must apply your strategy: ${personaDirective(agent.strategy)}`,
     ``,
     `FIXTURE: ${match.competition.name} · ${match.stage}`,
     `${match.home.name} (${match.home.code}, home) vs ${match.away.name} (${match.away.code}, away)`,
     ``,
+    `Also predict the exact full-time score (integer goals for each side) consistent with your pick.`,
+    ``,
     `Respond ONLY with strict JSON, no markdown, no prose outside it:`,
-    `{"probs":{"HOME":0.0-1.0,"DRAW":0.0-1.0,"AWAY":0.0-1.0},"pick":"HOME|DRAW|AWAY","reasoning":"one or two sentences in your own voice"}`,
-    `The three probabilities must sum to about 1.0 and "pick" must be your highest-probability outcome.`,
+    `{"probs":{"HOME":0.0-1.0,"DRAW":0.0-1.0,"AWAY":0.0-1.0},"pick":"HOME|DRAW|AWAY","score":{"home":0,"away":0},"reasoning":"one or two sentences in your own voice"}`,
+    `The three probabilities must sum to about 1.0, "pick" must be your highest-probability outcome,`,
+    `and "score" must agree with "pick" (home>away for HOME, away>home for AWAY, equal for DRAW).`,
   ].join("\n");
 }
 
@@ -288,6 +345,9 @@ async function liveInference(
         model,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 400,
+        // Vary outputs so distinct strategies do not collapse to one answer.
+        temperature: 0.9,
+        top_p: 0.95,
       }),
     });
     const data = await res.json();
@@ -315,12 +375,23 @@ async function liveInference(
     probs,
     pick,
     confidence: Math.max(probs.HOME, probs.DRAW, probs.AWAY),
+    scoreline: normalizeScore(parsed.score, pick),
     reasoning: parsed.reasoning || "",
     request: prompt,
     response: content,
     model,
     chatId: chatId || "live",
   };
+}
+
+// Coerce the model's score into clean integers that agree with the pick.
+function normalizeScore(raw: any, pick: Outcome): Scoreline {
+  let home = Math.max(0, Math.round(Number(raw?.home)) || 0);
+  let away = Math.max(0, Math.round(Number(raw?.away)) || 0);
+  if (pick === "HOME" && home <= away) home = away + 1;
+  if (pick === "AWAY" && away <= home) away = home + 1;
+  if (pick === "DRAW" && home !== away) away = home;
+  return { home, away };
 }
 
 function safeParse(s: string): any {

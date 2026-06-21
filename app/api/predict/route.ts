@@ -13,12 +13,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const agent = body.agentId ? getAgent(body.agentId) : undefined;
-  const match = body.matchId ? getMatch(body.matchId) : undefined;
+  const agent = body.agentId ? await getAgent(body.agentId) : undefined;
+  const match = body.matchId ? await getMatch(body.matchId) : undefined;
   if (!agent) return NextResponse.json({ error: "Unknown agent." }, { status: 404 });
   if (!match) return NextResponse.json({ error: "Unknown match." }, { status: 404 });
 
-  if (hasPrediction(agent.id, match.id)) {
+  // Core invariant: a pick can only be sealed BEFORE kickoff.
+  if (match.status !== "UPCOMING" || new Date(match.kickoff).getTime() <= Date.now()) {
+    return NextResponse.json(
+      { error: "Kickoff has passed. Picks must be sealed before the match starts." },
+      { status: 409 },
+    );
+  }
+
+  if (await hasPrediction(agent.id, match.id)) {
     return NextResponse.json(
       { error: `${agent.name} has already sealed a pick for this match. It cannot be changed.` },
       { status: 409 },
@@ -27,7 +35,7 @@ export async function POST(req: Request) {
 
   try {
     const prediction = await sealPrediction(agent, match);
-    addPrediction(prediction);
+    await addPrediction(prediction);
     return NextResponse.json({ prediction }, { status: 201 });
   } catch (err) {
     console.error("[predict] seal failed:", err);

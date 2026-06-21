@@ -6,17 +6,18 @@ import { CountUp } from "@/components/ui/count-up";
 import { Reveal } from "@/components/ui/reveal";
 import { agentBundle } from "@/lib/queries";
 import { shortHash } from "@/lib/utils";
+import { RUNTIME_MODEL } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
-export default function AgentPage({
+export default async function AgentPage({
   params,
   searchParams,
 }: {
   params: { handle: string };
   searchParams: { new?: string };
 }) {
-  const bundle = agentBundle(params.handle);
+  const bundle = await agentBundle(params.handle);
   if (!bundle) notFound();
   const { agent, stats, rank, rows } = bundle;
   const isNew = searchParams.new === "1";
@@ -53,7 +54,7 @@ export default function AgentPage({
                 {agent.strategy}
               </p>
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[0.62rem] text-muted">
-                <span>model · {agent.model}</span>
+                <span>model · {RUNTIME_MODEL} · 0G Compute</span>
                 <span>owner · {shortHash(agent.owner, 6, 4)}</span>
               </div>
             </div>

@@ -10,10 +10,8 @@ import { heroStats, ranked, tickerItems } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const stats = heroStats();
-  const ticks = tickerItems();
-  const board = ranked();
+export default async function HomePage() {
+  const [stats, ticks, board] = await Promise.all([heroStats(), tickerItems(), ranked()]);
   const top5 = board.slice(0, 5);
   const featured = board.slice(0, 6).map((r) => r.agent);
 

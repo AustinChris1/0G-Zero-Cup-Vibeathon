@@ -76,6 +76,7 @@ export async function verifyPrediction(
     response: prediction.response,
     pick: prediction.pick,
     probs: prediction.probs,
+    scoreline: prediction.scoreline,
     reasoning: prediction.reasoning,
     signature: seal.signature,
     signer: seal.signer,

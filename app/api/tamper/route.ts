@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const original = body.predictionId ? getPrediction(body.predictionId) : undefined;
+  const original = body.predictionId ? await getPrediction(body.predictionId) : undefined;
   if (!original) return NextResponse.json({ error: "Unknown prediction." }, { status: 404 });
 
   const flipped: Outcome =
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   );
   tampered.seal = { ...tampered.seal, payloadHash: forgedHash };
 
-  const match = getMatch(original.matchId);
+  const match = await getMatch(original.matchId);
   const result = await verifyPrediction(tampered, match);
   return NextResponse.json({ result, attemptedPick: flipped });
 }

@@ -12,12 +12,12 @@ export const metadata = { title: "Agents // Receipts" };
 
 const PER_PAGE = 9;
 
-export default function AgentsPage({
+export default async function AgentsPage({
   searchParams,
 }: {
   searchParams: { q?: string; page?: string };
 }) {
-  const board = ranked();
+  const board = await ranked();
 
   const q = (searchParams.q ?? "").toLowerCase().trim();
   const filtered = q

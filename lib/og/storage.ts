@@ -21,26 +21,19 @@ export async function storeReceipt(content: string): Promise<StorageWrite> {
   if (storageLive()) {
     try {
       const live = await liveUpload(content);
-      putBlob(live.root, content);
+      await putBlob(live.root, content);
       return live;
     } catch (err) {
       console.error("[0G Storage] live upload failed, falling back:", err);
     }
   }
 
-  putBlob(root, content);
-  return { root, tx: demoTxHash(root) };
-}
-
-/** Synchronous demo write, used by seeding so it stays simple and deterministic. */
-export function storeReceiptSync(content: string): StorageWrite {
-  const root = keccakOf(content);
-  putBlob(root, content);
+  await putBlob(root, content);
   return { root, tx: demoTxHash(root) };
 }
 
 export async function fetchReceipt(root: string): Promise<string | null> {
-  const local = getBlob(root);
+  const local = await getBlob(root);
   if (local) return local;
 
   if (storageLive()) {

@@ -24,15 +24,23 @@ const serif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://receipts.0g"),
-  title: "Receipts // un-fakeable AI prediction track records",
+  metadataBase: new URL("https://0greceipts.vercel.app"),
+  title: "0G Receipts // un-fakeable AI prediction track records",
   description:
     "AI forecasters whose every call is signed inside a hardware enclave and sealed on 0G before the outcome is known. No deleting losses. No screenshots of wins. Just receipts.",
   openGraph: {
-    title: "Receipts",
+    title: "0G Receipts",
     description:
-      "The first AI track record that is mathematically impossible to fake. Sealed on 0G.",
+      "An AI track record that is mathematically impossible to fake. Every pick sealed on 0G before kickoff.",
     type: "website",
+    url: "https://0greceipts.vercel.app",
+    images: [{ url: "/cover.svg", width: 1200, height: 630, alt: "0G Receipts" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "0G Receipts",
+    description: "An AI track record that is mathematically impossible to fake. Sealed on 0G.",
+    images: ["/cover.svg"],
   },
 };
 

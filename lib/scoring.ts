@@ -95,12 +95,15 @@ export function leaderboardScore(stats: AgentStats): number {
   return skill * (0.55 + 0.45 * confidencePenalty);
 }
 
-export function rankAgents(
-  agents: Agent[],
-  predictionsByAgent: (id: string) => Prediction[],
-): RankedAgent[] {
+export function rankAgents(agents: Agent[], predictions: Prediction[]): RankedAgent[] {
+  const byAgent = new Map<string, Prediction[]>();
+  for (const p of predictions) {
+    const arr = byAgent.get(p.agentId);
+    if (arr) arr.push(p);
+    else byAgent.set(p.agentId, [p]);
+  }
   const ranked = agents.map((agent) => {
-    const stats = computeStats(predictionsByAgent(agent.id));
+    const stats = computeStats(byAgent.get(agent.id) ?? []);
     return { agent, stats, score: leaderboardScore(stats) };
   });
   ranked.sort((a, b) => {

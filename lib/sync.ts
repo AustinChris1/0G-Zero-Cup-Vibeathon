@@ -20,7 +20,7 @@ const TTL_MINUTES = Number(process.env.SYNC_TTL_MINUTES || 10);
 let inFlight: Promise<SyncResult> | null = null;
 
 export async function syncFootball(opts: { force?: boolean } = {}): Promise<SyncResult> {
-  const last = getLastSync();
+  const last = await getLastSync();
   if (!opts.force && last && Date.now() - new Date(last).getTime() < TTL_MINUTES * 60_000) {
     return { ok: true, skipped: true, reason: "Data is fresh.", fetched: 0, added: 0, updated: 0, resolved: 0 };
   }
@@ -43,6 +43,6 @@ async function runSync(): Promise<SyncResult> {
       resolved: 0,
     };
   }
-  const { added, updated, resolved } = upsertMatches(matches);
+  const { added, updated, resolved } = await upsertMatches(matches);
   return { ok: true, fetched: matches.length, added, updated, resolved };
 }

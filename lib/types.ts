@@ -6,6 +6,11 @@ export interface Probabilities {
   AWAY: number;
 }
 
+export interface Scoreline {
+  home: number;
+  away: number;
+}
+
 export interface Team {
   name: string;
   code: string;
@@ -72,6 +77,7 @@ export interface Prediction {
   pick: Outcome;
   probs: Probabilities;
   confidence: number;
+  scoreline?: Scoreline;
   reasoning: string;
   model: string;
   request: string;
@@ -81,6 +87,7 @@ export interface Prediction {
   resolved: boolean;
   correct?: boolean;
   brier?: number;
+  exactScore?: boolean;
 }
 
 export interface AgentStats {

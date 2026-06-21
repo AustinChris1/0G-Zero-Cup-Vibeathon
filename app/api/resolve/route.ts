@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const match = body.matchId ? getMatch(body.matchId) : undefined;
+  const match = body.matchId ? await getMatch(body.matchId) : undefined;
   if (!match) return NextResponse.json({ error: "Unknown match." }, { status: 404 });
 
   const home = Number(body.home);
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Provide a valid scoreline." }, { status: 400 });
   }
 
-  const updated = resolveMatch(match.id, home, away);
+  const updated = await resolveMatch(match.id, home, away);
   if (!updated || !updated.result) {
     return NextResponse.json({ error: "Could not resolve." }, { status: 500 });
   }

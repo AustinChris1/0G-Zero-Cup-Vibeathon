@@ -28,9 +28,10 @@ const GUARANTEES = [
   },
 ];
 
-export default function ProofPage() {
-  const sample = listPredictions().find((p) => p.resolved) ?? listPredictions()[0];
-  const bundle = sample ? receiptBundle(sample.id) : null;
+export default async function ProofPage() {
+  const preds = await listPredictions();
+  const sample = preds.find((p) => p.resolved) ?? preds[0];
+  const bundle = sample ? await receiptBundle(sample.id) : null;
 
   return (
     <Container className="py-16">

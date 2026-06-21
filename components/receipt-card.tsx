@@ -7,6 +7,7 @@ import { Barcode } from "@/components/ui/barcode";
 import { Flag } from "@/components/ui/flag";
 import { VerifyButton } from "@/components/verify-button";
 import { cn, formatKickoff, shortHash } from "@/lib/utils";
+import { addressUrl, txUrl, storageUrl } from "@/lib/explorer";
 
 function pickName(p: Prediction, m: Match) {
   if (p.pick === "HOME") return m.home.name;
@@ -14,13 +15,25 @@ function pickName(p: Prediction, m: Match) {
   return "Draw";
 }
 
-function KV({ label, value }: { label: string; value: string }) {
+function KV({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-dashed border-ink/20 py-1.5">
       <span className="shrink-0 font-mono text-[0.62rem] uppercase tracking-wider text-ink/50">
         {label}
       </span>
-      <span className="truncate font-mono text-[0.7rem] text-ink/90">{value}</span>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate font-mono text-[0.7rem] text-ink/90 underline decoration-ink/30 underline-offset-2 hover:text-ink hover:decoration-ink"
+          title="View on 0G explorer"
+        >
+          {value} ↗
+        </a>
+      ) : (
+        <span className="truncate font-mono text-[0.7rem] text-ink/90">{value}</span>
+      )}
     </div>
   );
 }
@@ -125,6 +138,25 @@ export function ReceiptCard({
                 awayCode={match.away.code}
               />
             </div>
+            {prediction.scoreline && (
+              <div className="mt-3 flex items-center justify-between">
+                <span className="font-mono text-[0.6rem] uppercase tracking-widest text-ink/50">
+                  Full-time score call
+                </span>
+                <span className="flex items-center gap-2 font-display text-base font-bold text-ink">
+                  <span>
+                    {match.home.code} {prediction.scoreline.home} – {prediction.scoreline.away}{" "}
+                    {match.away.code}
+                  </span>
+                  {prediction.resolved &&
+                    (prediction.exactScore ? (
+                      <span className="stamp px-1.5 py-0.5 text-[0.55rem] text-[#1c7d3f]">EXACT ✓</span>
+                    ) : (
+                      <span className="font-mono text-[0.62rem] text-ink/40">miss</span>
+                    ))}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* reasoning */}
@@ -143,10 +175,18 @@ export function ReceiptCard({
               Cryptographic seal
             </div>
             <KV label="model" value={prediction.model} />
-            <KV label="signer" value={shortHash(seal.signer, 8, 6)} />
+            <KV label="signer" value={shortHash(seal.signer, 8, 6)} href={addressUrl(seal.signer)} />
             <KV label="digest" value={shortHash(seal.payloadHash, 8, 6)} />
-            <KV label="0g root" value={shortHash(seal.storageRoot, 8, 6)} />
-            <KV label="storage tx" value={shortHash(seal.storageTx, 8, 6)} />
+            <KV
+              label="0g root"
+              value={shortHash(seal.storageRoot, 8, 6)}
+              href={seal.mode === "live" ? storageUrl() : undefined}
+            />
+            <KV
+              label="storage tx"
+              value={shortHash(seal.storageTx, 8, 6)}
+              href={seal.mode === "live" ? txUrl(seal.storageTx) : undefined}
+            />
             <KV label="sealed" value={new Date(seal.sealedAt).toUTCString().replace("GMT", "UTC")} />
           </div>
 

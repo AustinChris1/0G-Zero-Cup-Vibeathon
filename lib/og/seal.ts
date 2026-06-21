@@ -1,8 +1,8 @@
 import type { Agent, Match, Prediction } from "../types";
 import { canonicalPayload, enclaveSign, hashPayload, keccakOf } from "./crypto";
 import { buildStoredReceipt, serializeReceipt } from "./document";
-import { demoInference, runInference, type InferenceResult } from "./compute";
-import { storeReceipt, storeReceiptSync } from "./storage";
+import { runInference, type InferenceResult } from "./compute";
+import { storeReceipt } from "./storage";
 import { sealMode } from "./mode";
 
 function predictionId(agentId: string, matchId: string, createdAt: string): string {
@@ -27,6 +27,7 @@ function assemble(
     pick: inf.pick,
     probs: inf.probs,
     confidence: inf.confidence,
+    scoreline: inf.scoreline,
     reasoning: inf.reasoning,
     model: inf.model,
     request: inf.request,
@@ -74,6 +75,7 @@ export async function sealPrediction(agent: Agent, match: Match): Promise<Predic
     response: inf.response,
     pick: inf.pick,
     probs: inf.probs,
+    scoreline: inf.scoreline,
     reasoning: inf.reasoning,
     signature,
     signer,
@@ -85,45 +87,5 @@ export async function sealPrediction(agent: Agent, match: Match): Promise<Predic
 
   return assemble(
     agent, match, inf, createdAt, storage, signature, signer, payloadHash, sealMode(),
-  );
-}
-
-/** Synchronous demo seal, used to generate the seed track records. */
-export function sealPredictionSync(
-  agent: Agent,
-  match: Match,
-  createdAt: string,
-): Prediction {
-  const inf = demoInference(agent, match);
-  const canonical = canonicalPayload({
-    agentId: agent.id,
-    matchId: match.id,
-    model: inf.model,
-    request: inf.request,
-    response: inf.response,
-    createdAt,
-  });
-  const payloadHash = hashPayload(canonical);
-  const { signature, signer } = enclaveSign(payloadHash);
-
-  const doc = buildStoredReceipt({
-    agentId: agent.id,
-    matchId: match.id,
-    model: inf.model,
-    request: inf.request,
-    response: inf.response,
-    pick: inf.pick,
-    probs: inf.probs,
-    reasoning: inf.reasoning,
-    signature,
-    signer,
-    payloadHash,
-    sealedAt: createdAt,
-    mode: "demo",
-  });
-  const storage = storeReceiptSync(serializeReceipt(doc));
-
-  return assemble(
-    agent, match, inf, createdAt, storage, signature, signer, payloadHash, "demo",
   );
 }

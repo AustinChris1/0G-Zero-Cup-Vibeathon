@@ -87,8 +87,13 @@ football-data.org for live fixtures. Solidity leaderboard contract for on-chain 
 With 0G testnet keys (`OG_MODE=live`, `OG_COMPUTE=on`) it runs the real 0G stack, and with
 a football-data.org token it pulls real fixtures. See README and docs/DEPLOY.md.
 
+## Team
+Cassandra — named for the prophet whose true predictions were never believed.
+Receipts is the cure: predictions that are cryptographically provable, so they
+cannot be doubted.
+
 ## Links (fill in)
 - Live demo:
 - Video:
 - Repo:
-- Team / contact:
+- Contact:

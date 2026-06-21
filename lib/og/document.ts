@@ -1,9 +1,12 @@
-import type { Outcome, Probabilities } from "../types";
+import type { Outcome, Probabilities, Scoreline } from "../types";
 
 /**
  * The exact bytes written to 0G Storage for a sealed pick. Anyone can download
  * this by its root hash and re-derive every proof in it with no access to our
  * database. Field order is fixed so the serialization is deterministic.
+ *
+ * scoreline is optional and omitted when undefined (JSON.stringify drops it), so
+ * receipts sealed before this field existed still serialize identically.
  */
 export interface StoredReceipt {
   v: number;
@@ -14,6 +17,7 @@ export interface StoredReceipt {
   response: string;
   pick: Outcome;
   probs: Probabilities;
+  scoreline?: Scoreline;
   reasoning: string;
   signature: string;
   signer: string;
@@ -32,6 +36,7 @@ export function buildStoredReceipt(input: Omit<StoredReceipt, "v">): StoredRecei
     response: input.response,
     pick: input.pick,
     probs: input.probs,
+    scoreline: input.scoreline,
     reasoning: input.reasoning,
     signature: input.signature,
     signer: input.signer,

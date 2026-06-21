@@ -13,12 +13,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const prediction = body.predictionId ? getPrediction(body.predictionId) : undefined;
+  const prediction = body.predictionId ? await getPrediction(body.predictionId) : undefined;
   if (!prediction) {
     return NextResponse.json({ error: "Unknown prediction." }, { status: 404 });
   }
 
-  const match = getMatch(prediction.matchId);
+  const match = await getMatch(prediction.matchId);
   const result = await verifyPrediction(prediction, match);
   return NextResponse.json({ result });
 }

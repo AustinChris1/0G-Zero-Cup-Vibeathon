@@ -4,11 +4,12 @@ import { Container } from "@/components/ui/section";
 import { ReceiptCard } from "@/components/receipt-card";
 import { TamperDemo } from "@/components/tamper-demo";
 import { receiptBundle } from "@/lib/queries";
+import { addressUrl, txUrl, storageUrl } from "@/lib/explorer";
 
 export const dynamic = "force-dynamic";
 
-export default function ReceiptPage({ params }: { params: { id: string } }) {
-  const bundle = receiptBundle(params.id);
+export default async function ReceiptPage({ params }: { params: { id: string } }) {
+  const bundle = await receiptBundle(params.id);
   if (!bundle) notFound();
   const { prediction, agent, match } = bundle;
   const { seal } = prediction;
@@ -41,11 +42,19 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
             </p>
           </div>
 
-          <ProofField label="Sealing key (signer)" value={seal.signer} />
+          <ProofField label="Sealing key (signer)" value={seal.signer} href={addressUrl(seal.signer)} />
           <ProofField label="Signed digest (keccak256)" value={seal.payloadHash} />
           <ProofField label="Enclave signature" value={seal.signature} />
-          <ProofField label="0G Storage root" value={seal.storageRoot} />
-          <ProofField label="0G Storage tx" value={seal.storageTx} />
+          <ProofField
+            label="0G Storage root"
+            value={seal.storageRoot}
+            href={seal.mode === "live" ? storageUrl() : undefined}
+          />
+          <ProofField
+            label="0G Storage tx"
+            value={seal.storageTx}
+            href={seal.mode === "live" ? txUrl(seal.storageTx) : undefined}
+          />
           <ProofField label="Sealed at" value={new Date(seal.sealedAt).toUTCString()} />
           <ProofField label="Runtime" value={seal.mode === "live" ? "0G Sealed Inference (live)" : "0G demo runtime (real signatures)"} />
 
@@ -56,11 +65,21 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
   );
 }
 
-function ProofField({ label, value }: { label: string; value: string }) {
+function ProofField({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="border border-ink-line bg-ink-soft p-3">
-      <div className="mb-1 font-mono text-[0.58rem] uppercase tracking-widest text-muted">
-        {label}
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="font-mono text-[0.58rem] uppercase tracking-widest text-muted">{label}</span>
+        {href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 font-mono text-[0.58rem] uppercase tracking-widest text-acid hover:underline"
+          >
+            view on 0G ↗
+          </a>
+        )}
       </div>
       <div className="break-all font-mono text-[0.72rem] text-chalk selection:bg-acid selection:text-ink">
         {value}

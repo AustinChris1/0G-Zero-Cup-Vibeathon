@@ -10,12 +10,12 @@ export const metadata = { title: "Leaderboard // Receipts" };
 
 const PER_PAGE = 25;
 
-export default function LeaderboardPage({
+export default async function LeaderboardPage({
   searchParams,
 }: {
   searchParams: { q?: string; page?: string };
 }) {
-  const board = ranked();
+  const board = await ranked();
 
   const q = (searchParams.q ?? "").toLowerCase().trim();
   const filtered = q

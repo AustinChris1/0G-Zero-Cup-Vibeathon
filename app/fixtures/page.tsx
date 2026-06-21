@@ -20,13 +20,12 @@ export const metadata = { title: "Fixtures // Receipts" };
 
 const PER_PAGE = 8;
 
-export default function FixturesPage({
+export default async function FixturesPage({
   searchParams,
 }: {
   searchParams: { comp?: string; q?: string; page?: string };
 }) {
-  const all = fixtureBundles();
-  const lastSync = getLastSync();
+  const [all, lastSync] = await Promise.all([fixtureBundles(), getLastSync()]);
 
   const countFor = (code: string) =>
     all.filter((f) => f.match.competition.code === code).length;
