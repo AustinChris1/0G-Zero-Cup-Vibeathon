@@ -14,11 +14,9 @@ export interface InferenceResult {
   chatId: string;
 }
 
-/* ------------------------------ team ratings ------------------------------ */
-// Rough strength priors (0..1), roughly tracking FIFA ranking / Elo, used both to
-// shape demo forecasts AND to ground the live model so it stops defaulting to the
-// first-listed team. It still makes the call; this is the context a human analyst
-// would have open.
+// Rough strength priors (0..1, ~ FIFA/Elo): shape demo forecasts and ground the
+// live model so it stops defaulting to the first-listed team. It still makes the
+// call; this is just the context a human analyst would have open.
 const STRENGTH: Record<string, number> = {
   ARG: 0.93, FRA: 0.92, ESP: 0.9, BRA: 0.89, ENG: 0.88, POR: 0.86, NED: 0.84, GER: 0.84, ITA: 0.83,
   BEL: 0.8, CRO: 0.8, URU: 0.8, COL: 0.79, MAR: 0.8, SEN: 0.78, JPN: 0.78, SUI: 0.77, DEN: 0.77,
@@ -31,6 +29,11 @@ const STRENGTH: Record<string, number> = {
 function strength(code: string): number {
   return STRENGTH[code] ?? 0.6; // neutral default for placeholders / unknown
 }
+// We only keep priors for national teams. Used to decide whether to feed the model
+// a strength line or let it judge club quality from its own knowledge.
+function rated(code: string): boolean {
+  return Object.prototype.hasOwnProperty.call(STRENGTH, code);
+}
 
 function tier(v: number): string {
   if (v >= 0.86) return "elite";
@@ -40,7 +43,7 @@ function tier(v: number): string {
   return "lower-tier";
 }
 
-/* ------------------------- deterministic randomness ------------------------- */
+// Deterministic per-(agent, match) randomness so demo forecasts are stable.
 function fnv1a(str: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -59,7 +62,6 @@ function mulberry32(seed: number) {
   };
 }
 
-/* ---------------------------- strategy -> style ---------------------------- */
 interface Style {
   homeBias: number;
   underdogBias: number;
@@ -91,9 +93,13 @@ function deriveStyle(strategy: string): Style {
   };
 }
 
-// Factual relative-strength context so the model anchors on team quality instead
-// of position. It still decides the call (and can back an upset per its strategy).
+// Relative-strength grounding so the model anchors on quality, not list position.
 function strengthContext(match: Match): string {
+  // No prior table for clubs: let the model judge from its own knowledge (it knows
+  // famous clubs well) rather than feed it a misleading flat/equal rating.
+  if (!rated(match.home.code) || !rated(match.away.code)) {
+    return `Judge the favourite yourself from what you know of each club: recent form, squad quality, league position, and home advantage. Do not treat the two clubs as automatically equal, and do not let the order they are listed influence your call.`;
+  }
   const h = strength(match.home.code);
   const a = strength(match.away.code);
   const sH = Math.round(h * 100);
@@ -101,10 +107,9 @@ function strengthContext(match: Match): string {
   const gap = Math.abs(sH - sA);
   const head = `STRENGTH (rough, 0-100, higher is better): ${match.home.name} ${sH} (${tier(h)}), ${match.away.name} ${sA} (${tier(a)}). The fixture order is administrative; it does NOT indicate home or favourite.`;
 
-  // qwen-7b will not reliably infer direction from raw numbers, so name the
-  // favourite outright. This is factual input (the Elo/market line a human analyst
-  // would have open), not the call: the model still sets the exact probabilities,
-  // the scoreline, and writes its own reasoning, and may back an upset per strategy.
+  // Name the favourite outright (qwen-7b won't infer direction from raw numbers).
+  // This is grounding, not the call: the model still sets the probs, score and
+  // reasoning, and a contrarian agent can still back the upset.
   if (gap < 6) {
     return `${head} The two sides are closely matched (gap ${gap}); expect a tight game that can go either way, with a real chance of a draw.`;
   }
@@ -116,9 +121,8 @@ function strengthContext(match: Match): string {
   return `${head} On quality ${stronger} is the better side and should be favoured to win (roughly 50-65%); ${weaker} is the underdog and is less likely to win, though it can keep it close. Favour ${stronger} by about a goal. Do not pick ${weaker} unless your strategy gives a deliberate contrarian reason. Make the probabilities and scoreline reflect that.`;
 }
 
-// Factual venue context for the model to reason from (not an instruction). The
-// World Cup is a single-host tournament, so its matches are at neutral sites
-// unless a host nation is playing. Leagues are genuine home/away.
+// Venue context (grounding, not an instruction): the World Cup is single-host, so
+// matches are neutral sites unless a host nation plays; leagues are real home/away.
 function venueNote(match: Match): string {
   const where = match.venue ? ` at ${match.venue}` : "";
   if (match.competition.code === "WC") {
@@ -173,7 +177,7 @@ function personaDirective(strategy: string): string {
   return lines.join(" ");
 }
 
-/* ------------------------------ the forecast ------------------------------ */
+// The demo-mode strength engine: a logistic on the rating gap, then shaped by style.
 function forecast(agent: Agent, match: Match): {
   probs: Probabilities;
   scoreline: Scoreline;
@@ -301,7 +305,6 @@ function writeReasoning(
   return base + draws;
 }
 
-/* ------------------------------ public API ------------------------------ */
 export function demoInference(agent: Agent, match: Match): InferenceResult {
   const request = buildPrompt(agent, match);
   const { probs, scoreline, reasoning } = forecast(agent, match);
@@ -382,7 +385,7 @@ function buildPrompt(agent: Agent, match: Match): string {
   ].join("\n");
 }
 
-/* ----------------------------- live 0G Compute ----------------------------- */
+// Live 0G Compute: ledger + signer set up once per boot, then cached.
 let ledgerReady = false;
 const acknowledged = new Set<string>();
 

@@ -1,13 +1,11 @@
 import { keccak256, toUtf8Bytes, Wallet, recoverAddress } from "ethers";
 
 /**
- * Deterministic demo "enclave" signer. In live mode the signature comes from a
- * real 0G TEE provider key instead, but the verification math below is the same
- * elliptic-curve recovery either way. This is the load-bearing primitive: a
- * sealed pick cannot be altered without invalidating its signature.
- *
- * The fallback key is a well-known throwaway dev key. Override in production
- * demos with DEMO_ENCLAVE_KEY so receipts stay verifiable across restarts.
+ * Deterministic demo "enclave" signer. In live mode the signature comes from a real
+ * 0G TEE provider key instead, but the recovery math below is identical. This is the
+ * load-bearing primitive: a sealed pick cannot be altered without breaking its signature.
+ * The fallback is a well-known throwaway dev key; override with DEMO_ENCLAVE_KEY so
+ * receipts stay verifiable across restarts.
  */
 const DEMO_ENCLAVE_KEY =
   process.env.DEMO_ENCLAVE_KEY ||

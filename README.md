@@ -1,4 +1,4 @@
-# Receipts
+# 0G Receipts
 
 **An AI track record that is mathematically impossible to fake. Live on 0G. Built for the 0G Zero Cup.**
 
@@ -19,10 +19,6 @@ data; every match and every pick is real.
 ## Documentation
 
 - [docs/WORKFLOW.md](docs/WORKFLOW.md) - how the whole system works, end to end
-- [docs/DEMO_VIDEO.md](docs/DEMO_VIDEO.md) - shot-by-shot script for the submission video
-- [docs/SUBMISSION.md](docs/SUBMISSION.md) - paste-ready submission copy
-- [docs/JUDGE_NOTES.md](docs/JUDGE_NOTES.md) - prepared answers to the hard questions
-- [docs/DEPLOY.md](docs/DEPLOY.md) - deploy to Vercel (CLI or GitHub)
 
 ---
 
@@ -49,8 +45,8 @@ npm run dev
 # open http://localhost:3000
 ```
 
-It boots straight into **demo mode** with a full World Cup bracket, seven agents, and a hundred-plus
-already-sealed picks. **No keys, no wallet, no config required.**
+It boots straight into **demo mode** from a bundled snapshot of real fixtures, seven agents, and a
+set of sample sealed receipts, so it is never empty. **No keys, no wallet, no config required.**
 
 ### Demo mode is not fake
 
@@ -63,8 +59,8 @@ provider). The verification math is identical.
 
 ### Real World Cup data (hybrid)
 
-The app ships with a curated bracket so it always has something to show. To layer in
-real 2026 World Cup fixtures and results, pick a provider in `.env` via
+The app ships with a bundled snapshot of real fixtures so it always has something to show. To pull
+fresh 2026 World Cup fixtures and results, pick a provider in `.env` via
 `FOOTBALL_PROVIDER` (the data layer is pluggable, see [`lib/data/football.ts`](lib/data/football.ts)):
 
 - **`football-data`** (default, recommended): full 2026 World Cup on the free tier.
@@ -77,7 +73,7 @@ real 2026 World Cup fixtures and results, pick a provider in `.env` via
 Open **Fixtures** and hit **Sync live World Cup data**. It pulls the real tournament,
 merges fixtures into the store ([`lib/sync.ts`](lib/sync.ts)), auto-scores any match that
 has finished, and seeds a few agent picks on new real fixtures so the field is alive. Real
-fixtures are tagged `live data` in the UI; the curated seed stays as the sample track record.
+fixtures are tagged `live data` in the UI; the bundled snapshot stays as the sample track record.
 
 It is a true hybrid: no token, provider down, or season not in your plan, and the app
 silently keeps running on the seed. The Sync button shows the exact provider error so you
@@ -102,16 +98,38 @@ installs and runs without the optional SDKs.
 
 ---
 
-## The one honest caveat (from our 0G research)
+## Straight answers to the hard questions
 
-The 0G Compute SDK's `processResponse()` returns a boolean and is scoped to your live broker
-session; the broker does not yet expose a clean "any third party can re-verify this saved receipt
-later" path (its own `Interface.md` marks third-party quote verification as `TBD`). So Receipts owns
-the transferable-proof layer itself: at seal time we capture the signature material, signing
-address, and exact request+response, write all of it into the stored receipt, and ship our **own**
-verifier ([`lib/og/verify.ts`](lib/og/verify.ts)) that re-checks the signature independently of any
-broker session. That is exactly the gap that turns "the platform verified it once" into "anyone can
-audit it forever," and it is the part we built.
+We would rather you hear the caveats from us than find them.
+
+**"Is this live on 0G, or a mock?"** Live. Picks run through real 0G Compute Sealed Inference
+(`qwen/qwen2.5-omni-7b` in a TEE, attestation verified on every call) and every receipt is written
+to real 0G Storage with an on-chain transaction (chain id 16602). A zero-config demo mode with real
+ECDSA signing also exists so the proof works with no keys, but the deployed app runs on the real stack.
+
+**"0G's SDK already verifies the TEE signature, so what did you build?"** 0G's `processResponse()`
+returns a boolean scoped to your live broker session (its own `Interface.md` marks third-party quote
+verification as `TBD`); it is not a path for anyone, later, with no session, to re-verify a saved
+pick. A track record needs exactly that. So at seal time we capture the signature, signing address,
+and exact request and response, write all of it into the stored receipt, and ship our **own** verifier
+([`lib/og/verify.ts`](lib/og/verify.ts)) that re-checks it independently. That transferable-proof
+layer turns "the platform verified it once" into "anyone can audit it forever," and it is the part we
+built, and the moat.
+
+**"Why is the leaderboard, or some competition tabs, empty?"** Because the data is real, not mock.
+Agents can only honestly predict upcoming matches, so settled results and Brier scores populate as
+real matches are played during the tournament window. Domestic leagues between seasons show empty
+tabs until they publish their new fixtures. We chose an honest empty start over a fake full one.
+
+**"Is the AI real, or scripted?"** Real. The only live model on 0G right now is a small 7B, which
+separates the agent personas less sharply than a frontier model would, so picks can cluster. The
+strategies are injected into the prompt and steer it; bigger models, as they come online on 0G, will
+separate them further. Nothing about the proof depends on the model.
+
+**"Is it truly impossible to fake?"** Precise claim: you cannot alter a sealed pick, or backdate
+one, without breaking a cryptographic check anyone can run, because forging the signature requires
+the enclave key you do not have. What we do not claim: that an agent is forced to enter every match.
+We are upfront about that boundary.
 
 ---
 
@@ -134,8 +152,8 @@ lib/
     verify.ts           independent 4-step verifier (the moat)
     chain.ts            on-chain settlement
     seal.ts             infer -> sign -> store pipeline
-  store.ts              file-backed store
-  seed.ts               the World Cup bracket + agents + sealed history
+  store.ts              shared store (Upstash Redis on Vercel, file fallback locally)
+  seed.ts               agent personas only (real fixtures + picks come from data/snapshot.json)
   scoring.ts            Brier, calibration, leaderboard ranking
 contracts/
   Leaderboard.sol       trustless settlement on 0G Chain

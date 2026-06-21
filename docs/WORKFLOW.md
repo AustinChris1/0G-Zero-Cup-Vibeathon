@@ -16,26 +16,22 @@ anyone can re-check that proof without trusting us.
 
 ## The lifecycle of a single pick
 
-```
-  YOU                AGENT (0G Compute)        SEAL (crypto)         0G STORAGE / CHAIN
-   |                       |                        |                        |
-   |  pick a fixture       |                        |                        |
-   |---------------------->|                        |                        |
-   |                       |  reason about match    |                        |
-   |                       |  inside a TEE          |                        |
-   |                       |  output is SIGNED      |                        |
-   |                       |----------------------->|                        |
-   |                       |                        |  hash(request+response)|
-   |                       |                        |  sign the hash         |
-   |                       |                        |----------------------->|
-   |                       |                        |   write signed receipt |
-   |                       |                        |   get root + tx + time |
-   |   sealed receipt      |                        |                        |
-   |<------------------------------------------------------------------------|
-   |                                                                         |
-   |   ... match is played ...                                               |
-   |                                                                         |
-   |   result comes in  ->  every pick scored (Brier)  ->  settled on chain  |
+```mermaid
+sequenceDiagram
+    actor You
+    participant Agent as Agent · 0G Compute (TEE)
+    participant Seal as Seal · keccak256 + ECDSA
+    participant Store as 0G Storage / Chain
+
+    You->>Agent: pick an upcoming fixture
+    Note over Agent: reasons about the match inside a<br/>hardware enclave; the output is signed
+    Agent->>Seal: signed model output
+    Note over Seal: hash(request + response),<br/>then sign the hash
+    Seal->>Store: write the signed receipt
+    Note over Store: stored, returns merkle root +<br/>on-chain tx + block timestamp
+    Store-->>You: sealed receipt (root, tx, time)
+    Note over You,Store: the match is played
+    Note over You,Store: result arrives → every pick scored (Brier) → settled on 0G Chain
 ```
 
 The order is the whole point: **nothing is stored before it is signed, and
@@ -82,19 +78,17 @@ nothing is signed after the outcome is known.**
 
 ## Verification flow (why a forgery fails)
 
-```
-  honest receipt                          forged receipt (pick changed)
-  --------------                          -----------------------------
-  hash(content) == digest      PASS       hash(new content) recomputed   PASS*
-  recover(sig)  == signer      PASS       recover(old sig)  != signer    FAIL
-  stored copy   == root        PASS       altered copy      != root      FAIL
-  sealed time   <  kickoff     PASS       (unchanged)                    PASS
-  ----------------------------------      ------------------------------------
-  RESULT: valid                           RESULT: rejected
+| Check | Honest receipt | Forged receipt (pick changed) |
+| --- | :---: | :---: |
+| Content still hashes to the signed digest | PASS | PASS \* |
+| Signature recovers to the sealing key | PASS | **FAIL** |
+| Stored copy still matches its storage root | PASS | **FAIL** |
+| Sealed before kickoff | PASS | PASS |
+| **Result** | **valid** | **rejected** |
 
-  *a naive forger fails the first check too; a clever one who recomputes the
-   hash still cannot forge the signature without the enclave key.
-```
+\* A naive forger fails this first check too. A clever one recomputes the content
+hash so it passes, but still cannot forge the enclave signature without the enclave
+key, so the second and third checks reject it.
 
 This is exactly what the "Attack this receipt" button demonstrates live.
 
