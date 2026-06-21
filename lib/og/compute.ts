@@ -15,17 +15,29 @@ export interface InferenceResult {
 }
 
 /* ------------------------------ team ratings ------------------------------ */
-// Rough strength priors (0..1) so demo forecasts track real-ish expectations.
+// Rough strength priors (0..1), roughly tracking FIFA ranking / Elo, used both to
+// shape demo forecasts AND to ground the live model so it stops defaulting to the
+// first-listed team. It still makes the call; this is the context a human analyst
+// would have open.
 const STRENGTH: Record<string, number> = {
-  ARG: 0.92, FRA: 0.9, BRA: 0.88, ENG: 0.86, ESP: 0.87, POR: 0.84,
-  NED: 0.82, GER: 0.83, BEL: 0.78, CRO: 0.76, URU: 0.77, USA: 0.66,
-  MEX: 0.64, MAR: 0.72, JPN: 0.68, SEN: 0.67, COL: 0.71, SUI: 0.65,
-  KOR: 0.63, DEN: 0.69, ITA: 0.8, CAN: 0.6,
+  ARG: 0.93, FRA: 0.92, ESP: 0.9, BRA: 0.89, ENG: 0.88, POR: 0.86, NED: 0.84, GER: 0.84, ITA: 0.83,
+  BEL: 0.8, CRO: 0.8, URU: 0.8, COL: 0.79, MAR: 0.8, SEN: 0.78, JPN: 0.78, SUI: 0.77, DEN: 0.77,
+  NOR: 0.76, MEX: 0.75, USA: 0.75, AUT: 0.74, TUR: 0.74, ALG: 0.74, CIV: 0.74, SRB: 0.74, NGA: 0.74,
+  EGY: 0.73, ECU: 0.73, SWE: 0.73, KOR: 0.73, CZE: 0.72, UKR: 0.71, IRN: 0.71, SCO: 0.71, CAN: 0.71,
+  CMR: 0.7, POL: 0.7, GHA: 0.69, PAR: 0.68, PER: 0.67, CHI: 0.67, TUN: 0.67, RSA: 0.67, AUS: 0.67,
+  BIH: 0.66, COD: 0.64, QAT: 0.63, UZB: 0.62, CRC: 0.62, JAM: 0.61, KSA: 0.61, PAN: 0.58, IRQ: 0.58,
+  CPV: 0.56, NZL: 0.55, JOR: 0.53, HAI: 0.5, CUW: 0.46,
 };
 function strength(code: string): number {
-  if (STRENGTH[code] !== undefined) return STRENGTH[code];
-  // deterministic fallback for any unseen code
-  return 0.5 + (fnv1a(code) % 30) / 100;
+  return STRENGTH[code] ?? 0.6; // neutral default for placeholders / unknown
+}
+
+function tier(v: number): string {
+  if (v >= 0.86) return "elite";
+  if (v >= 0.78) return "very strong";
+  if (v >= 0.7) return "solid";
+  if (v >= 0.6) return "mid-tier";
+  return "lower-tier";
 }
 
 /* ------------------------- deterministic randomness ------------------------- */
@@ -79,6 +91,50 @@ function deriveStyle(strategy: string): Style {
   };
 }
 
+// Factual relative-strength context so the model anchors on team quality instead
+// of position. It still decides the call (and can back an upset per its strategy).
+function strengthContext(match: Match): string {
+  const h = strength(match.home.code);
+  const a = strength(match.away.code);
+  const sH = Math.round(h * 100);
+  const sA = Math.round(a * 100);
+  const gap = Math.abs(sH - sA);
+  const head = `STRENGTH (rough, 0-100, higher is better): ${match.home.name} ${sH} (${tier(h)}), ${match.away.name} ${sA} (${tier(a)}). The fixture order is administrative; it does NOT indicate home or favourite.`;
+
+  // qwen-7b will not reliably infer direction from raw numbers, so name the
+  // favourite outright. This is factual input (the Elo/market line a human analyst
+  // would have open), not the call: the model still sets the exact probabilities,
+  // the scoreline, and writes its own reasoning, and may back an upset per strategy.
+  if (gap < 6) {
+    return `${head} The two sides are closely matched (gap ${gap}); expect a tight game that can go either way, with a real chance of a draw.`;
+  }
+  const stronger = sH >= sA ? match.home.name : match.away.name;
+  const weaker = sH >= sA ? match.away.name : match.home.name;
+  if (gap >= 18) {
+    return `${head} On quality this is a clear mismatch (gap ${gap}): ${stronger} is much stronger and should be a strong favourite (roughly 65-85%), most likely winning by two or more goals. ${weaker} winning would be a major upset. Make the probabilities and scoreline reflect that.`;
+  }
+  return `${head} On quality ${stronger} is the better side and should be favoured to win (roughly 50-65%); ${weaker} is the underdog and is less likely to win, though it can keep it close. Favour ${stronger} by about a goal. Do not pick ${weaker} unless your strategy gives a deliberate contrarian reason. Make the probabilities and scoreline reflect that.`;
+}
+
+// Factual venue context for the model to reason from (not an instruction). The
+// World Cup is a single-host tournament, so its matches are at neutral sites
+// unless a host nation is playing. Leagues are genuine home/away.
+function venueNote(match: Match): string {
+  const where = match.venue ? ` at ${match.venue}` : "";
+  if (match.competition.code === "WC") {
+    const HOSTS = new Set(["USA", "MEX", "CAN"]);
+    const host = HOSTS.has(match.home.code)
+      ? match.home.name
+      : HOSTS.has(match.away.code)
+        ? match.away.name
+        : null;
+    return host
+      ? `VENUE: World Cup${where}, in the host country. ${host} (a host nation) has home support; the other side does not.`
+      : `VENUE: World Cup${where}, a neutral site in the host country (USA/Canada/Mexico). Neither team is playing at home.`;
+  }
+  return `VENUE: ${match.home.name}'s home ground${where}.`;
+}
+
 // A blunt, concrete instruction per archetype so a small model actually leans
 // into the strategy instead of defaulting to the obvious favourite.
 function personaDirective(strategy: string): string {
@@ -128,7 +184,11 @@ function forecast(agent: Agent, match: Match): {
   const sH = strength(match.home.code);
   const sA = strength(match.away.code);
 
-  const homeAdv = 0.12 + style.homeBias;
+  // The World Cup is at neutral venues in the host countries, so the nominal
+  // "home" side has no real home advantage unless it is a host nation.
+  const HOSTS = new Set(["USA", "MEX", "CAN"]);
+  const neutral = match.competition.code === "WC" && !HOSTS.has(match.home.code);
+  const homeAdv = neutral ? 0 : 0.12 + style.homeBias;
   const diff = sH + homeAdv - sA;
   const logistic = (x: number) => 1 / (1 + Math.exp(-x));
 
@@ -246,7 +306,18 @@ export function demoInference(agent: Agent, match: Match): InferenceResult {
   const request = buildPrompt(agent, match);
   const { probs, scoreline, reasoning } = forecast(agent, match);
   const pick = topPick(probs);
-  const response = JSON.stringify({ probs, pick, score: scoreline, reasoning });
+  const { hk, ak } = outputKeys(match);
+  // Emit the same name-keyed shape the live model is asked for, so the sealed
+  // request/response pair is internally consistent in both modes.
+  const response = JSON.stringify({
+    [`prob_${hk}`]: round2(probs.HOME),
+    [`prob_${ak}`]: round2(probs.AWAY),
+    prob_draw: round2(probs.DRAW),
+    winner: pick === "HOME" ? match.home.name : pick === "AWAY" ? match.away.name : "Draw",
+    [`goals_${hk}`]: scoreline.home,
+    [`goals_${ak}`]: scoreline.away,
+    reasoning,
+  });
   return {
     probs,
     pick,
@@ -271,7 +342,22 @@ export async function runInference(agent: Agent, match: Match): Promise<Inferenc
   return demoInference(agent, match);
 }
 
+// Keys for the model's JSON, derived from each side's code. Keying the output by
+// TEAM (not HOME/AWAY slots) is what stops qwen-7b defaulting to the first-listed
+// side: with named keys it reasons about the teams, not their position.
+function outputKeys(match: Match): { hk: string; ak: string } {
+  const clean = (c: string) => (c || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  let hk = clean(match.home.code) || "HOME";
+  let ak = clean(match.away.code) || "AWAY";
+  if (hk === ak) {
+    hk = `${hk}_H`;
+    ak = `${ak}_A`;
+  }
+  return { hk, ak };
+}
+
 function buildPrompt(agent: Agent, match: Match): string {
+  const { hk, ak } = outputKeys(match);
   return [
     `You are "${agent.name}", a football forecaster with a STRONG, distinctive style.`,
     `Your strategy, which you follow aggressively even when it disagrees with the obvious favourite:`,
@@ -281,15 +367,18 @@ function buildPrompt(agent: Agent, match: Match): string {
     `market consensus. Two different strategies should produce visibly different numbers.`,
     `How you must apply your strategy: ${personaDirective(agent.strategy)}`,
     ``,
-    `FIXTURE: ${match.competition.name} · ${match.stage}`,
-    `${match.home.name} (${match.home.code}, home) vs ${match.away.name} (${match.away.code}, away)`,
+    `MATCH: ${match.competition.name} · ${match.stage}`,
+    `${match.home.name} (${hk}) vs ${match.away.name} (${ak})`,
+    venueNote(match),
+    strengthContext(match),
     ``,
-    `Also predict the exact full-time score (integer goals for each side) consistent with your pick.`,
+    `Give a win probability for each team plus the draw (the three sum to about 1.0), name the most`,
+    `likely winner, and predict the exact full-time score (integer goals for each side).`,
     ``,
     `Respond ONLY with strict JSON, no markdown, no prose outside it:`,
-    `{"probs":{"HOME":0.0-1.0,"DRAW":0.0-1.0,"AWAY":0.0-1.0},"pick":"HOME|DRAW|AWAY","score":{"home":0,"away":0},"reasoning":"one or two sentences in your own voice"}`,
-    `The three probabilities must sum to about 1.0, "pick" must be your highest-probability outcome,`,
-    `and "score" must agree with "pick" (home>away for HOME, away>home for AWAY, equal for DRAW).`,
+    `{"prob_${hk}":0.0-1.0,"prob_${ak}":0.0-1.0,"prob_draw":0.0-1.0,"winner":"${match.home.name}|${match.away.name}|Draw","goals_${hk}":0,"goals_${ak}":0,"reasoning":"one or two sentences in your own voice"}`,
+    `"winner" must be the team with your highest win probability (or "Draw"), and the goals must agree`,
+    `with it (more goals for the winner; equal for a draw).`,
   ].join("\n");
 }
 
@@ -345,8 +434,9 @@ async function liveInference(
         model,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 400,
-        // Vary outputs so distinct strategies do not collapse to one answer.
-        temperature: 0.9,
+        // Some variation so strategies don't collapse to one answer, but low
+        // enough that the strength grounding dominates over noise.
+        temperature: 0.7,
         top_p: 0.95,
       }),
     });
@@ -368,20 +458,77 @@ async function liveInference(
     .catch(() => false);
   console.log("[0G Compute] response received, TEE verified:", teeVerified);
 
-  const parsed = safeParse(content);
-  const probs = normalize(parsed.probs);
-  const pick = (parsed.pick as Outcome) || topPick(probs);
+  const { probs, pick, scoreline, reasoning } = parseLive(content, match);
   return {
     probs,
     pick,
     confidence: Math.max(probs.HOME, probs.DRAW, probs.AWAY),
-    scoreline: normalizeScore(parsed.score, pick),
-    reasoning: parsed.reasoning || "",
+    scoreline,
+    reasoning,
     request: prompt,
     response: content,
     model,
     chatId: chatId || "live",
   };
+}
+
+// Pull the model's name-keyed JSON back into the app's HOME/DRAW/AWAY shape. We
+// match on the team codes we sent, with several fallbacks so a slightly off-format
+// reply still parses instead of collapsing to a uniform default.
+function parseLive(
+  content: string,
+  match: Match,
+): { probs: Probabilities; pick: Outcome; scoreline: Scoreline; reasoning: string } {
+  const { hk, ak } = outputKeys(match);
+  const o = safeParse(content);
+  const p = o?.probs && typeof o.probs === "object" ? o.probs : {};
+
+  let ph = num(o[`prob_${hk}`], o.prob_home, o.HOME, p[hk], p.HOME, p.home);
+  let pa = num(o[`prob_${ak}`], o.prob_away, o.AWAY, p[ak], p.AWAY, p.away);
+  let pd = num(o.prob_draw, o.DRAW, p.DRAW, p.draw);
+  if (ph === null && pa === null && pd === null) {
+    ph = 0.34;
+    pa = 0.33;
+    pd = 0.33;
+  }
+  const probs = normalizeTriple(ph ?? 0, pd ?? 0, pa ?? 0);
+
+  // Pick: prefer the model's explicit "winner" (by name or code), else the top prob.
+  const w = String(o.winner ?? o.pick ?? "").toLowerCase();
+  const names = (t: { name: string; code: string }) =>
+    [t.name.toLowerCase(), t.code.toLowerCase()].filter(Boolean);
+  let pick: Outcome;
+  if (w && names(match.home).some((n) => w.includes(n))) pick = "HOME";
+  else if (w && names(match.away).some((n) => w.includes(n))) pick = "AWAY";
+  else if (w.includes("draw")) pick = "DRAW";
+  else pick = topPick(probs);
+
+  const gh = num(o[`goals_${hk}`], o.goals_home, o?.score?.home, o.home);
+  const ga = num(o[`goals_${ak}`], o.goals_away, o?.score?.away, o.away);
+  const scoreline = normalizeScore({ home: gh, away: ga }, pick);
+
+  return { probs, pick, scoreline, reasoning: o.reasoning || o.reason || "" };
+}
+
+function num(...vals: any[]): number | null {
+  for (const v of vals) {
+    if (v === undefined || v === null || v === "") continue;
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function round2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
+
+function normalizeTriple(h: number, d: number, a: number): Probabilities {
+  h = Math.max(0, h);
+  d = Math.max(0, d);
+  a = Math.max(0, a);
+  const sum = h + d + a || 1;
+  return { HOME: h / sum, DRAW: d / sum, AWAY: a / sum };
 }
 
 // Coerce the model's score into clean integers that agree with the pick.
@@ -402,11 +549,4 @@ function safeParse(s: string): any {
   } catch {
     return { probs: { HOME: 0.34, DRAW: 0.33, AWAY: 0.33 }, reasoning: s.slice(0, 400) };
   }
-}
-function normalize(p: any): Probabilities {
-  const h = Number(p?.HOME) || 0.34;
-  const d = Number(p?.DRAW) || 0.33;
-  const a = Number(p?.AWAY) || 0.33;
-  const sum = h + d + a || 1;
-  return { HOME: h / sum, DRAW: d / sum, AWAY: a / sum };
 }
