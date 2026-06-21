@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/section";
-import { ReceiptCard } from "@/components/receipt-card";
+import { AgentFeed } from "@/components/agent-feed";
 import { CountUp } from "@/components/ui/count-up";
-import { Reveal } from "@/components/ui/reveal";
 import { agentBundle } from "@/lib/queries";
 import { shortHash } from "@/lib/utils";
 import { RUNTIME_MODEL } from "@/lib/constants";
@@ -109,13 +108,7 @@ export default async function AgentPage({
             <Link href="/fixtures" className="text-acid underline">fixtures</Link>.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {rows.map(({ prediction, match }, i) => (
-              <Reveal key={prediction.id} delay={(i % 3) * 0.06}>
-                <ReceiptCard prediction={prediction} agent={agent} match={match} />
-              </Reveal>
-            ))}
-          </div>
+          <AgentFeed agent={agent} rows={rows} />
         )}
       </div>
     </Container>

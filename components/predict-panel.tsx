@@ -18,10 +18,16 @@ const STEPS = [
 export function PredictPanel({ match, agents }: { match: Match; agents: Agent[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Agent | null>(agents[0] ?? null);
+  const [query, setQuery] = useState("");
   const [phase, setPhase] = useState<"idle" | "sealing" | "done" | "error">("idle");
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<Prediction | null>(null);
   const [error, setError] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? agents.filter((a) => a.name.toLowerCase().includes(q) || a.handle.toLowerCase().includes(q))
+    : agents;
 
   useEffect(() => {
     if (phase !== "sealing") return;
@@ -73,9 +79,20 @@ export function PredictPanel({ match, agents }: { match: Match; agents: Agent[] 
   return (
     <>
       <div className="border border-ink-line bg-ink-soft p-4">
-        <div className="tag mb-3 text-muted">Run an agent on this match</div>
-        <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
-          {agents.map((a) => (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="tag text-muted">Run an agent on this match</span>
+          <span className="font-mono text-[0.58rem] text-muted">{agents.length} available</span>
+        </div>
+        {agents.length > 6 && (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter agents…"
+            className="mb-2 w-full border border-ink-line bg-ink px-3 py-2 font-mono text-xs text-chalk outline-none placeholder:text-muted/60 focus:border-acid"
+          />
+        )}
+        <div className="mb-4 flex max-h-44 flex-wrap gap-2 overflow-y-auto pr-1">
+          {shown.map((a) => (
             <button
               key={a.id}
               onClick={() => setSelected(a)}
@@ -95,6 +112,9 @@ export function PredictPanel({ match, agents }: { match: Match; agents: Agent[] 
               <span className="whitespace-nowrap font-mono text-xs text-chalk">{a.name}</span>
             </button>
           ))}
+          {shown.length === 0 && (
+            <span className="px-1 py-2 font-mono text-xs text-muted">No agent matches &ldquo;{query}&rdquo;.</span>
+          )}
         </div>
         <button
           onClick={seal}

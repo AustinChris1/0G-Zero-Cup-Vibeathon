@@ -9,7 +9,9 @@ import snapshotJson from "../data/snapshot.json";
 // Bundled real-data snapshot used to self-seed an empty store (first run on Redis,
 // or a fresh local file). Regenerate with: npm run snapshot
 const SNAPSHOT = snapshotJson as unknown as Database;
-const REDIS_KEY = "receipts:db:v2";
+// Bump this to force a clean re-seed from the snapshot on deploy (old key is left
+// orphaned). v3: dropped pre-fix sample picks that cited home advantage at the WC.
+const REDIS_KEY = "receipts:db:v3";
 
 const DATA_DIR = process.env.VERCEL
   ? path.join(os.tmpdir(), "receipts-data")

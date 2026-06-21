@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Container, SectionHeading } from "@/components/ui/section";
 import { PredictPanel } from "@/components/predict-panel";
-import { ResolveControls } from "@/components/resolve-controls";
 import { SyncButton } from "@/components/sync-button";
 import { AutoSync } from "@/components/auto-sync";
 import { Flag } from "@/components/ui/flag";
@@ -173,6 +172,15 @@ function FixtureBlock({ bundle }: { bundle: FixtureBundle }) {
     AWAY: consensus.AWAY / n,
   };
 
+  // Most confident picks first, then collapse the rest into a count so the card
+  // stays compact whether 3 or 50 agents have weighed in.
+  const MAX_VISIBLE = 4;
+  const ordered = [...predictions].sort(
+    (a, b) => b.prediction.confidence - a.prediction.confidence,
+  );
+  const shownPicks = ordered.slice(0, MAX_VISIBLE);
+  const extraPicks = predictions.length - shownPicks.length;
+
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden border border-ink-line bg-ink-soft">
       <div className="border-b border-ink-line p-4 sm:p-5">
@@ -224,9 +232,9 @@ function FixtureBlock({ bundle }: { bundle: FixtureBundle }) {
         </div>
       )}
 
-      {/* agent picks */}
+      {/* agent picks: show the most confident few, then a count so it scales to many agents */}
       <div className="flex-1 divide-y divide-ink-line">
-        {predictions.slice(0, 6).map(({ prediction, agent }) => {
+        {shownPicks.map(({ prediction, agent }) => {
           const pickCode =
             prediction.pick === "HOME"
               ? match.home.code
@@ -260,20 +268,16 @@ function FixtureBlock({ bundle }: { bundle: FixtureBundle }) {
             </Link>
           );
         })}
+        {extraPicks > 0 && (
+          <div className="px-5 py-2 font-mono text-[0.62rem] uppercase tracking-widest text-muted">
+            + {extraPicks} more sealed {extraPicks === 1 ? "pick" : "picks"}
+          </div>
+        )}
       </div>
 
       {/* controls */}
       <div className="space-y-3 border-t border-ink-line p-5">
         {!resolved && <PredictPanel match={match} agents={unpredicted} />}
-        {!resolved && (
-          <div className="flex justify-end">
-            <ResolveControls
-              matchId={match.id}
-              homeCode={match.home.code}
-              awayCode={match.away.code}
-            />
-          </div>
-        )}
         {resolved && match.result && (
           <div className="text-center font-mono text-[0.62rem] uppercase tracking-widest text-muted">
             outcome ·{" "}

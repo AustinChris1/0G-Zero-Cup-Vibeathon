@@ -121,6 +121,14 @@ function strengthContext(match: Match): string {
   return `${head} On quality ${stronger} is the better side and should be favoured to win (roughly 50-65%); ${weaker} is the underdog and is less likely to win, though it can keep it close. Favour ${stronger} by about a goal. Do not pick ${weaker} unless your strategy gives a deliberate contrarian reason. Make the probabilities and scoreline reflect that.`;
 }
 
+// True when there is genuinely no home side: a World Cup match where neither team
+// is a host nation. Used to strip home-advantage logic and language.
+function isNeutralVenue(match: Match): boolean {
+  if (match.competition.code !== "WC") return false;
+  const HOSTS = new Set(["USA", "MEX", "CAN"]);
+  return !HOSTS.has(match.home.code) && !HOSTS.has(match.away.code);
+}
+
 // Venue context (grounding, not an instruction): the World Cup is single-host, so
 // matches are neutral sites unless a host nation plays; leagues are real home/away.
 function venueNote(match: Match): string {
@@ -140,8 +148,9 @@ function venueNote(match: Match): string {
 }
 
 // A blunt, concrete instruction per archetype so a small model actually leans
-// into the strategy instead of defaulting to the obvious favourite.
-function personaDirective(strategy: string): string {
+// into the strategy instead of defaulting to the obvious favourite. At a neutral
+// venue the home-advantage archetype is reframed: there is no home side to back.
+function personaDirective(strategy: string, neutral: boolean): string {
   const style = deriveStyle(strategy);
   const lines: string[] = [];
   if (style.label === "contrarian" || style.underdogBias > 0) {
@@ -166,7 +175,9 @@ function personaDirective(strategy: string): string {
   }
   if (style.homeBias > 0) {
     lines.push(
-      "You back the home side and crowd hard: lean clearly toward the home team and a home win.",
+      neutral
+        ? "Your usual edge is home advantage, but this match is at a neutral venue with no home side, so that edge does NOT apply here. Judge the two teams purely on merit and do not invoke home support or crowd."
+        : "You back the home side and crowd hard: lean clearly toward the home team and a home win.",
     );
   }
   if (lines.length === 0) {
@@ -361,6 +372,7 @@ function outputKeys(match: Match): { hk: string; ak: string } {
 
 function buildPrompt(agent: Agent, match: Match): string {
   const { hk, ak } = outputKeys(match);
+  const neutral = isNeutralVenue(match);
   return [
     `You are "${agent.name}", a football forecaster with a STRONG, distinctive style.`,
     `Your strategy, which you follow aggressively even when it disagrees with the obvious favourite:`,
@@ -368,12 +380,15 @@ function buildPrompt(agent: Agent, match: Match): string {
     ``,
     `Stay fully in character. Your probabilities, pick and score MUST reflect this strategy, not the`,
     `market consensus. Two different strategies should produce visibly different numbers.`,
-    `How you must apply your strategy: ${personaDirective(agent.strategy)}`,
+    `How you must apply your strategy: ${personaDirective(agent.strategy, neutral)}`,
     ``,
     `MATCH: ${match.competition.name} · ${match.stage}`,
     `${match.home.name} (${hk}) vs ${match.away.name} (${ak})`,
     venueNote(match),
     strengthContext(match),
+    neutral
+      ? `Both teams are equally away from home, so home advantage is irrelevant and must not be raised at all, in any form (not even to say it is absent). Base your reasoning only on the teams' quality, form and matchup.`
+      : ``,
     ``,
     `Give a win probability for each team plus the draw (the three sum to about 1.0), name the most`,
     `likely winner, and predict the exact full-time score (integer goals for each side).`,
@@ -382,7 +397,9 @@ function buildPrompt(agent: Agent, match: Match): string {
     `{"prob_${hk}":0.0-1.0,"prob_${ak}":0.0-1.0,"prob_draw":0.0-1.0,"winner":"${match.home.name}|${match.away.name}|Draw","goals_${hk}":0,"goals_${ak}":0,"reasoning":"one or two sentences in your own voice"}`,
     `"winner" must be the team with your highest win probability (or "Draw"), and the goals must agree`,
     `with it (more goals for the winner; equal for a draw).`,
-  ].join("\n");
+  ]
+    .filter((l) => l !== null && l !== undefined)
+    .join("\n");
 }
 
 // Live 0G Compute: ledger + signer set up once per boot, then cached.
