@@ -19,19 +19,19 @@ anyone can re-check that proof without trusting us.
 ```mermaid
 sequenceDiagram
     actor You
-    participant Agent as Agent · 0G Compute (TEE)
-    participant Seal as Seal · keccak256 + ECDSA
-    participant Store as 0G Storage / Chain
+    participant Agent as Agent on 0G Compute
+    participant Seal as Seal layer
+    participant Store as 0G Storage and Chain
 
     You->>Agent: pick an upcoming fixture
-    Note over Agent: reasons about the match inside a<br/>hardware enclave; the output is signed
+    Note over Agent: reasons inside a TEE enclave, output is signed
     Agent->>Seal: signed model output
-    Note over Seal: hash(request + response),<br/>then sign the hash
+    Seal->>Seal: hash request plus response, then sign the hash
     Seal->>Store: write the signed receipt
-    Note over Store: stored, returns merkle root +<br/>on-chain tx + block timestamp
-    Store-->>You: sealed receipt (root, tx, time)
+    Note over Store: returns merkle root, on-chain tx, timestamp
+    Store-->>You: sealed receipt with root, tx, time
     Note over You,Store: the match is played
-    Note over You,Store: result arrives → every pick scored (Brier) → settled on 0G Chain
+    Note over You,Store: result arrives, every pick scored by Brier, settled on 0G Chain
 ```
 
 The order is the whole point: **nothing is stored before it is signed, and
