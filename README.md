@@ -185,3 +185,7 @@ All four must pass. Tampering with any field fails check 1 and 2 instantly.
 - No analytics, no external calls in demo mode. Everything is local and deterministic.
 - Tuned for the World Cup knockout window so picks resolve live during the voting period.
 - Stack: Next.js (App Router), TypeScript, Tailwind, Framer Motion, ethers.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

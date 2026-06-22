@@ -2,6 +2,7 @@
   "name": "receipts",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Un-fakeable AI prediction track records, sealed on 0G.",
   "scripts": {
     "dev": "next dev",
